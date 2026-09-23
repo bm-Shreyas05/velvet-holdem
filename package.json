@@ -1,0 +1,27 @@
+{
+  "name": "velvet-holdem",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Single-player No-Limit Texas Hold'em against adaptive, information-fair AI opponents.",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "node scripts/build.mjs && node scripts/serve.mjs --open",
+    "serve": "node scripts/serve.mjs",
+    "test": "node --test --test-reporter=spec \"tests/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "simulate": "node scripts/simulate.ts",
+    "evaluate-ai": "node scripts/evaluate-ai.ts",
+    "exhaustive": "node scripts/exhaustive-evaluator.ts",
+    "gen:preflop": "node scripts/gen-preflop-table.ts",
+    "check": "npm run typecheck && npm test && node scripts/simulate.ts --quick && npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.6",
+    "esbuild": "0.28.2",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  }
+}
