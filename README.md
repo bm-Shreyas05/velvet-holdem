@@ -60,6 +60,7 @@ npm run evaluate-ai      # AI evaluation by simulated play (about 5 minutes; --q
 npm run exhaustive       # evaluates all 133,784,560 seven-card hands
 npm run typecheck
 npm run check            # typecheck + tests + quick simulation + build
+npm run gen:preflop      # regenerate src/ai/preflop-table.ts (seeded, so the output is identical)
 ```
 
 What the checks cover:
@@ -117,6 +118,7 @@ src/
   assets/   procedurally drawn cards, chips, avatars, icons (SVG)
   audio/    synthesised sound (Web Audio)
   dev/      developer scenarios
+  sim/      scripted sparring bots and a headless presenter for tests and simulations
   styles/   main.css
 scripts/    build, serve, simulate, evaluate-ai, exhaustive-evaluator, gen-preflop-table, dev/
 tests/      node:test suites
