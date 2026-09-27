@@ -14,9 +14,12 @@
     "evaluate-ai": "node scripts/evaluate-ai.ts",
     "exhaustive": "node scripts/exhaustive-evaluator.ts",
     "gen:preflop": "node scripts/gen-preflop-table.ts",
-    "check": "npm run typecheck && npm test && node scripts/simulate.ts --quick && npm run build"
+    "check": "npm run typecheck && npm test && node scripts/simulate.ts --quick && npm run build",
+    "test:e2e": "node scripts/build.mjs && playwright test",
+    "gen:images": "node scripts/gen-images.ts"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@types/node": "24.13.6",
     "esbuild": "0.28.2",
     "typescript": "5.9.3"

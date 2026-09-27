@@ -31,8 +31,50 @@ export interface StageLayout {
   seats: SeatGeometry[];
 }
 
-export function chooseOrientation(width: number, height: number): Orientation {
-  return width / Math.max(1, height) < 0.9 ? 'portrait' : 'landscape';
+export interface Bounds {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+/**
+ * Everything drawn on the stage, in stage units. Side seats' name plates reach past the design
+ * rectangle (up to ~40 units in landscape), so scaling to the rectangle alone would clip them.
+ * Seat extents were measured from the rendered seats: 170 units wide plus badges, with cards
+ * above or below the plate depending on which side of the table the seat faces.
+ */
+export function contentBounds(layout: StageLayout): Bounds {
+  const b: Bounds = { left: 0, top: 0, right: layout.width, bottom: layout.height };
+  for (const seat of layout.seats) {
+    const { x, y } = seat.anchor;
+    const [up, down] = seat.side === 'bottom' ? [50, 50] : seat.side === 'top' ? [80, 76] : [50, 80];
+    b.left = Math.min(b.left, x - 92);
+    b.right = Math.max(b.right, x + 92);
+    b.top = Math.min(b.top, y - up);
+    b.bottom = Math.max(b.bottom, y + down);
+  }
+  return b;
+}
+
+/** The largest scale at which the whole layout fits a box of the given size. */
+export function fitScale(layout: StageLayout, width: number, height: number): number {
+  const b = contentBounds(layout);
+  return Math.min(width / (b.right - b.left), height / (b.bottom - b.top));
+}
+
+/**
+ * Picks the orientation that shows the table larger. A change needs a clear gain (10%), so small
+ * resizes — such as the action bar growing on the player's turn — never flip the layout back
+ * and forth.
+ */
+export function chooseOrientation(width: number, height: number, seatCount: number, current: Orientation | null = null): Orientation {
+  const fit = (o: Orientation) => fitScale(computeLayout(seatCount, o), width, height);
+  const portrait = fit('portrait');
+  const landscape = fit('landscape');
+  if (current === 'portrait' && landscape < portrait * 1.1) return 'portrait';
+  if (current === 'landscape' && portrait < landscape * 1.1) return 'landscape';
+  return portrait > landscape ? 'portrait' : 'landscape';
 }
 
 export function computeLayout(seatCount: number, orientation: Orientation): StageLayout {

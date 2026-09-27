@@ -374,6 +374,15 @@ kbd {
   font-weight: 600;
 }
 
+.menu-link[hidden] {
+  display: none;
+}
+
+/* Install spans the full row so the 2-column grid stays balanced. */
+.menu-secondary > .menu-link:nth-child(5) {
+  grid-column: 1 / -1;
+}
+
 .menu-link:hover {
   color: var(--ink);
   background: var(--surface);
@@ -384,6 +393,10 @@ kbd {
   color: var(--ink-3);
   max-width: 40ch;
   text-wrap: balance;
+}
+
+.menu-fine--legal {
+  margin-top: -6px;
 }
 
 .notice {
@@ -849,6 +862,13 @@ kbd {
 
 .card-back {
   transform: rotateY(180deg);
+}
+
+/* Hide the turned-away side explicitly too: some WebKit builds ignore backface-visibility and
+   would paint the back over the face. Flips swap the sides at the edge-on moment (table-view). */
+.card[data-up='true'] .card-back,
+.card[data-up='false'] .card-face {
+  visibility: hidden;
 }
 
 .card.is-winning {
@@ -2140,6 +2160,8 @@ input[type='checkbox'][role='switch']:checked::after {
   .table-layout {
     grid-template-columns: minmax(0, 1fr);
     position: relative;
+    /* Clip the off-screen log drawer; otherwise phones can pan sideways to it. */
+    overflow: hidden;
   }
 
   .only-narrow {

@@ -3,6 +3,9 @@
 A single-player poker game against AI opponents who play by the same rules and see the same
 information you do. It runs entirely in the browser, offline, from one self-contained HTML file.
 
+**Play online: https://bm-shreyas05.github.io/velvet-holdem/** — free, no sign-up, installable as
+an app and playable offline. Play money only: chips have no cash value and cannot be bought.
+
 - Complete, rules-correct No-Limit Hold'em engine: blinds and antes, heads-up rules, minimum
   raises, incomplete all-in raises, uncalled bets, side pots, split pots and odd chips.
 - Five opponent personalities driven by one decision engine that reads ranges, estimates equity
@@ -13,7 +16,11 @@ information you do. It runs entirely in the browser, offline, from one self-cont
 
 ## Play
 
-Requirements: Node.js 22.18 or newer (only to build and test).
+Open the link above. To install it, use your browser's *Install app* (the menu also offers
+*Install app* where the browser supports it) or, on iPhone and iPad, *Share → Add to Home Screen*.
+Once loaded it works without a connection.
+
+To run it locally you need Node.js 22.18 or newer (only to build and test):
 
 ```bash
 npm install
@@ -54,7 +61,8 @@ showing or mucking losing hands) apply immediately and are remembered.
 ## Tests and verification
 
 ```bash
-npm test                 # 84 unit and integration tests (engine, AI, controller, UI model, saves)
+npm test                 # 86 unit and integration tests (engine, AI, controller, UI model, saves)
+npm run test:e2e         # browser tests: Chromium, Firefox, WebKit, iPhone and Android sizes
 npm run simulate         # stress simulation (200k random hands, 400 freeze-outs, 12 AI games)
 npm run evaluate-ai      # AI evaluation by simulated play (about 5 minutes; --quick for 1)
 npm run exhaustive       # evaluates all 133,784,560 seven-card hands
@@ -84,6 +92,13 @@ What the checks cover:
   equal the engine's state after every batch.
 - **Saves.** Round trip, damaged newest save (falls back to the previous one), edited payload
   (checksum), foreign data, newer versions (refused), older versions (migrated), failed writes.
+- **Real browsers** (`npm run test:e2e`, Playwright; run `npx playwright install` once first).
+  In desktop Chromium, Firefox and WebKit and in iPhone 13 and Pixel 7 emulation: the menu loads
+  without errors or sideways scrolling, several hands are played against the AI in its Web
+  Worker with chip totals checked between hands, a game survives a reload, your hole cards are
+  rendered face up (checked from screenshot pixels) and every seat is fully on screen when the
+  action bar grows. In Chromium, the service worker makes the game playable offline. These tests
+  found a WebKit rendering bug (hole cards painted face down) and phone layout problems, all fixed.
 
 ### AI evaluation (last full run)
 
@@ -120,8 +135,13 @@ src/
   dev/      developer scenarios
   sim/      scripted sparring bots and a headless presenter for tests and simulations
   styles/   main.css
-scripts/    build, serve, simulate, evaluate-ai, exhaustive-evaluator, gen-preflop-table, dev/
+  pwa/      service worker template (the build stamps in a version and the asset list)
+public/     web-app manifest, icons, social preview image (copied into dist/)
+scripts/    build, serve, simulate, evaluate-ai, exhaustive-evaluator, gen-preflop-table,
+            gen-images, dev/
 tests/      node:test suites
+e2e/        Playwright browser tests
+.github/    CI and GitHub Pages deployment
 ```
 
 **Engine.** `HoldemHand` holds the complete state of a hand in private fields and exposes only
@@ -173,7 +193,36 @@ snapshot after every batch.
   generator (every deck order reachable). Seeded randomness exists only for tests, simulations,
   replays and the developer mode, and AI randomness is a separate stream unrelated to the deck.
 - **Procedural assets.** Cards, chips, avatars, icons and sounds are generated, so there are no
-  binary assets to lose and everything scales cleanly.
+  binary assets to lose and everything scales cleanly. The only images are the app icons and the
+  link-preview picture, which `npm run gen:images` renders from the same artwork with a local
+  Chrome or Edge.
+- **Static hosting.** The game needs no server: any static host can serve `dist/`. The service
+  worker precaches this exact build and serves it first, so it loads instantly and offline; a new
+  deployment changes the worker, the browser fetches it in the background, and the game offers a
+  reload.
+
+## Deploying
+
+Pushes to `main` run [the CI workflow](.github/workflows/ci.yml): typecheck, unit tests, a quick
+simulation, the build and the browser tests. If all pass, `dist/` is published to GitHub Pages
+(repository *Settings → Pages → Source: GitHub Actions*). The build receives the site's address
+as `SITE_URL`, which it needs for absolute link-preview URLs.
+
+Any other static host works the same way:
+
+```bash
+SITE_URL=https://your.domain/path/ npm run build
+```
+
+then upload `dist/` except `artifact.html` (a variant for hosts that supply their own page shell).
+Serve it over HTTPS; offline play and installing need a secure origin.
+
+## Browser support
+
+Chrome and Edge 111+, Firefox 113+, Safari 16.2+ (iPhone and iPad on iOS 16.2+) — every browser
+updated since spring 2023. Older browsers may lose some colours and borders. The game has been
+tested in the engines above through Playwright (including phone emulation), not yet on physical
+phones.
 
 ## Rules as implemented
 
@@ -193,7 +242,9 @@ snapshot after every batch.
 
 ## Saved data
 
-Everything is stored in the browser's local storage for the page:
+Nothing leaves your device: there are no accounts, analytics or ads. (The host serving the page
+sees ordinary web requests when it loads.) Everything is stored in the browser's local storage
+for the page:
 `velvet.session` (the game in progress, saved after every action — including mid-hand, so
 closing the page never lets anyone escape a hand), `velvet.history` (up to 300 hands of the
 current game), `velvet.career` (lifetime statistics) and `velvet.settings`.
@@ -202,7 +253,8 @@ Each is written as a versioned, checksummed envelope into two alternating slots,
 interrupted write never destroys the previous good save. Damaged or edited saves are detected
 and the game falls back to the last good copy or explains what happened; saves from a newer
 version are refused rather than misread. To reset, use *Settings → Reset lifetime statistics*,
-start a new game, or clear the site's data in the browser.
+start a new game, or clear the site's data in the browser (which also removes the offline copy
+the service worker keeps in the browser's cache storage).
 
 ## Developer mode
 
@@ -219,6 +271,7 @@ snapshots for debugging. None of this is visible in normal play.
 - The AI is a strong heuristic player, not a solver: its bet-sizing menu is small and it models
   opponents with summary statistics rather than full game-theoretic strategies.
 - The button always moves to the next player; the tournament "dead button" rule is not used.
-- Sounds are synthesised rather than recorded.
+- Sounds are synthesised rather than recorded. On iPhone, sound follows the ring/silent switch.
+- Tested in real browser engines with phone emulation, but not yet on physical phones.
 - Saves live in one browser profile; private-browsing modes that block storage keep the game in
   memory only (the game says so).

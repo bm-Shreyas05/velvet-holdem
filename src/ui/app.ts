@@ -61,10 +61,12 @@ export class App {
     this.applySettings();
     this.#media?.addEventListener?.('change', () => this.applySettings());
     const unlock = () => this.audio.unlock();
-    window.addEventListener('pointerdown', unlock, { passive: true });
-    window.addEventListener('keydown', unlock);
+    // iOS Safari only accepts audio unlocks from gestures that end (touchend/click), so listen to both ends.
+    for (const type of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) window.addEventListener(type, unlock, { passive: true });
     window.addEventListener('keydown', (e) => this.#onKey(e));
     window.addEventListener('beforeunload', () => this.#saveNow());
+    // Mobile browsers often skip beforeunload; pagehide fires when a tab is closed or frozen.
+    window.addEventListener('pagehide', () => this.#saveNow());
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') this.#saveNow();
     });

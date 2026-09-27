@@ -7,6 +7,7 @@ import { SCENARIOS } from '../dev/scenarios.ts';
 import { MAX_OPPONENTS, MIN_OPPONENTS, type NewGameSetup, STRUCTURES, type Structure, defaultSetup, validateSetup } from '../game/config.ts';
 import type { App } from './app.ts';
 import { confirm, toast } from './dialogs.ts';
+import { canInstall, onInstallAvailabilityChange, promptInstall } from './pwa.ts';
 import { h } from './dom.ts';
 
 /** Main menu: continue, new game, and the secondary screens. */
@@ -62,6 +63,15 @@ export function renderMenu(app: App): HTMLElement {
       return b;
     }),
   );
+  // Offered only when the browser supports installing and the game is not installed yet.
+  const install = h('button', { type: 'button', class: 'menu-link', html: `${ICONS.install}<span>Install app</span>` });
+  install.addEventListener('click', () => void promptInstall());
+  install.hidden = !canInstall();
+  secondary.append(install);
+  const stopWatching = onInstallAvailabilityChange(() => {
+    if (secondary.isConnected) install.hidden = !canInstall();
+    else stopWatching();
+  });
 
   return h(
     'main',
@@ -76,6 +86,7 @@ export function renderMenu(app: App): HTMLElement {
       h('div', { class: 'menu-primary' }, ...primary),
       secondary,
       h('p', { class: 'menu-fine' }, 'Cards are shuffled by your browser’s secure random generator. Opponents see only what a real player at the table would see.'),
+      h('p', { class: 'menu-fine menu-fine--legal' }, 'Play money only. Chips have no cash value and cannot be bought, sold or won. Everything stays in this browser.'),
     ),
   );
 }

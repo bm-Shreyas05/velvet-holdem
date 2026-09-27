@@ -1,5 +1,6 @@
 import { App } from './ui/app.ts';
 import { toast } from './ui/dialogs.ts';
+import { initPwa } from './ui/pwa.ts';
 
 function fatal(root: HTMLElement, error: unknown): void {
   console.error(error);
@@ -20,6 +21,7 @@ function boot(): void {
   const root = document.getElementById('app');
   if (!root) return;
   try {
+    initPwa();
     const app = new App(root);
     app.showMenu();
     let reported = 0;

@@ -96,7 +96,8 @@ export class AudioEngine {
         this.#applyGains();
         this.#syncAmbience();
       }
-      if (this.#ctx.state === 'suspended') void this.#ctx.resume();
+      // iOS also reports 'interrupted' after calls or backgrounding; any non-running state resumes.
+      if (this.#ctx.state !== 'running' && this.#ctx.state !== 'closed') void this.#ctx.resume();
     } catch {
       this.#failed = true;
     }

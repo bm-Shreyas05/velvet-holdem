@@ -6,7 +6,7 @@ import { chipStackSvg, chipTopSvg } from '../assets/chips.ts';
 import type { Settings } from '../game/settings.ts';
 import { clear, h, svgEl } from './dom.ts';
 import { chips, ordinal } from './format.ts';
-import { type Orientation, type Point, type StageLayout, chooseOrientation, computeLayout } from './layout.ts';
+import { type Orientation, type Point, type StageLayout, chooseOrientation, computeLayout, contentBounds, fitScale } from './layout.ts';
 import type { Motion } from './motion.ts';
 import type { SeatDisplay, TableDisplay } from './table-model.ts';
 import { totalPot } from './table-model.ts';
@@ -44,6 +44,8 @@ export class TableView {
   #layout!: StageLayout;
   #orientation: Orientation = 'landscape';
   #scale = 1;
+  /** False until the first successful layout, so the first orientation is chosen on merit alone. */
+  #laidOut = false;
   #seatCount: number;
   #seats: SeatEls[] = [];
   #bets: HTMLElement[] = [];
@@ -83,13 +85,22 @@ export class TableView {
   relayout(): void {
     const box = this.root.parentElement?.getBoundingClientRect();
     if (!box || box.width < 10 || box.height < 10) return;
-    const orientation = chooseOrientation(box.width, box.height);
+    const orientation = chooseOrientation(box.width, box.height, this.#seatCount, this.#laidOut ? this.#orientation : null);
     if (orientation !== this.#orientation) {
       this.#build(orientation);
       if (this.#display) this.render(this.#display, this.#sidePotInfo);
     }
-    this.#scale = Math.min(box.width / this.#layout.width, box.height / this.#layout.height);
-    this.#stage.style.transform = `translate(-50%, -50%) scale(${this.#scale})`;
+    this.#scale = fitScale(this.#layout, box.width, box.height);
+    this.#laidOut = true;
+    this.#applyTransform();
+  }
+
+  /** Scales the stage and centres its content (which can extend past the design rectangle). */
+  #applyTransform(): void {
+    const b = contentBounds(this.#layout);
+    const dx = (this.#layout.width / 2 - (b.left + b.right) / 2) * this.#scale;
+    const dy = (this.#layout.height / 2 - (b.top + b.bottom) / 2) * this.#scale;
+    this.#stage.style.transform = `translate(-50%, -50%) translate(${dx}px, ${dy}px) scale(${this.#scale})`;
   }
 
   // -------------------------------------------------------------------------------------------
@@ -170,7 +181,7 @@ export class TableView {
     this.#fx = h('div', { class: 'fx-layer', 'aria-hidden': 'true' });
     this.#stage.append(this.#fx);
     this.root.append(this.#stage);
-    if (this.#scale) this.#stage.style.transform = `translate(-50%, -50%) scale(${this.#scale})`;
+    if (this.#laidOut) this.#applyTransform();
   }
 
   #pos(p: Point): string {
@@ -395,9 +406,37 @@ export class TableView {
   /** Flips the human's (or a revealed player's) cards face up with a 3D turn. */
   async flipSeat(seat: number): Promise<void> {
     const cards = [...this.#seats[seat]!.cards.querySelectorAll<HTMLElement>('.card')];
-    await Promise.all(
-      cards.map((c, k) => this.#motion.run(c.querySelector('.card-inner')!, [{ transform: 'rotateY(180deg)' }, { transform: 'rotateY(0deg)' }], 380, { delay: this.#motion.duration(k * 90) })),
-    );
+    await Promise.all(cards.map((c, k) => this.#flip(c, 380, this.#motion.duration(k * 90))));
+  }
+
+  /**
+   * Turns a face-up card over from its back. The two sides swap visibility exactly when the card
+   * is edge-on rather than relying on backface-visibility alone, which some WebKit builds ignore
+   * (the back then paints over the face). Afterwards the effects are removed and the CSS resting
+   * state — which hides the turned-away side the same way — takes over.
+   */
+  async #flip(card: HTMLElement, ms: number, delay = 0): Promise<void> {
+    const inner = card.querySelector<HTMLElement>('.card-inner');
+    const face = card.querySelector<HTMLElement>('.card-face');
+    const back = card.querySelector<HTMLElement>('.card-back');
+    if (!inner || !face || !back) return;
+    const timing = { delay, easing: 'linear' };
+    const swap = (from: string, to: string): Keyframe[] => [{ visibility: from }, { visibility: from, offset: 0.5 }, { visibility: to, offset: 0.5 }, { visibility: to }];
+    await Promise.all([
+      this.#motion.run(
+        inner,
+        [
+          { transform: 'rotateY(180deg)', easing: 'cubic-bezier(.45,0,1,1)' },
+          { transform: 'rotateY(90deg)', offset: 0.5, easing: 'cubic-bezier(0,0,.3,1)' },
+          { transform: 'rotateY(0deg)' },
+        ],
+        ms,
+        timing,
+      ),
+      this.#motion.run(back, swap('visible', 'hidden'), ms, timing),
+      this.#motion.run(face, swap('hidden', 'visible'), ms, timing),
+    ]);
+    for (const el of [inner, face, back]) for (const a of el.getAnimations()) a.cancel();
   }
 
   /** Chips slide from a player to their bet position. */
@@ -444,7 +483,7 @@ export class TableView {
       slot.append(el);
       onCard();
       await this.#motion.run(el, [{ transform: 'translateY(-16px) scale(.92)', opacity: 0 }, { transform: 'none', opacity: 1 }], 200);
-      await this.#motion.run(el.querySelector('.card-inner')!, [{ transform: 'rotateY(180deg)' }, { transform: 'rotateY(0deg)' }], 320);
+      await this.#flip(el, 320);
     }
   }
 

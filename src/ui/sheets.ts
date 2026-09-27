@@ -406,6 +406,13 @@ export function openHelp(app: App, onClose?: () => void): SheetHandle {
         h('ul', { class: 'style-list' }, ...Object.values(STYLES).map((s) => h('li', {}, h('strong', {}, s.label), ` — ${s.blurb}`))),
         h('p', {}, 'Every opponent uses the same decision engine and sees exactly what a player in their seat would see: their own cards, the board, the bets, and any hands shown down. They learn your habits from what you do at the table, and adjust as they gather evidence.'),
       ),
+      h(
+        'section',
+        {},
+        h('h3', {}, 'Play money and privacy'),
+        h('p', {}, 'Velvet is a free game played with play money. Chips have no cash value, cannot be bought, sold or exchanged, and nothing can be won. There is no gambling of any kind.'),
+        h('p', {}, 'The game runs entirely in your browser. Your games, history, statistics and settings are stored only on this device; nothing is sent anywhere, and there are no accounts, ads or tracking.'),
+      ),
     ),
   );
 }
