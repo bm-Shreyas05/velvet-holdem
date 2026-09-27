@@ -40,17 +40,21 @@ export interface Bounds {
 
 /**
  * Everything drawn on the stage, in stage units. Side seats' name plates reach past the design
- * rectangle (up to ~40 units in landscape), so scaling to the rectangle alone would clip them.
- * Seat extents were measured from the rendered seats: 170 units wide plus badges, with cards
- * above or below the plate depending on which side of the table the seat faces.
+ * rectangle (up to ~50 units in landscape), so scaling to the rectangle alone would clip them.
+ * Horizontally a seat extends 96 units from its anchor: name plates are capped at 190 units
+ * (CSS max-width) whatever the font, plus a unit for rounding. The vertical extents were
+ * measured: cards sit above or below the plate depending on which side of the table it faces.
  */
+/** Half the widest name plate (.seat-plate max-width: 190px) plus a unit for rounding. */
+const PLATE_REACH = 96;
+
 export function contentBounds(layout: StageLayout): Bounds {
   const b: Bounds = { left: 0, top: 0, right: layout.width, bottom: layout.height };
   for (const seat of layout.seats) {
     const { x, y } = seat.anchor;
     const [up, down] = seat.side === 'bottom' ? [50, 50] : seat.side === 'top' ? [80, 76] : [50, 80];
-    b.left = Math.min(b.left, x - 92);
-    b.right = Math.max(b.right, x + 92);
+    b.left = Math.min(b.left, x - PLATE_REACH);
+    b.right = Math.max(b.right, x + PLATE_REACH);
     b.top = Math.min(b.top, y - up);
     b.bottom = Math.max(b.bottom, y + down);
   }

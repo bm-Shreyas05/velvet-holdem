@@ -112,6 +112,8 @@ body {
 
 body {
   margin: 0;
+  /* Player names are free text; long unbroken ones must wrap rather than overflow panels. */
+  overflow-wrap: break-word;
   background: var(--bg);
   color: var(--ink);
   font: 400 var(--fs) / 1.45 var(--font-ui);
@@ -1496,6 +1498,7 @@ kbd {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow-wrap: anywhere;
   border-left: 1px solid var(--line);
   background: color-mix(in srgb, var(--surface) 70%, transparent);
 }

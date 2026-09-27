@@ -21,8 +21,14 @@ async function noHorizontalScroll(page: Page): Promise<void> {
   expect(overflow, 'page must not scroll sideways').toBeLessThanOrEqual(1);
 }
 
-async function startGame(page: Page): Promise<void> {
+async function startGame(page: Page, options: { longNames?: boolean } = {}): Promise<void> {
   await page.getByRole('button', { name: /New game/ }).click();
+  if (options.longNames) {
+    // 24 wide letters (the maximum) push every name plate to its CSS width cap in any font, so
+    // layout checks do not depend on which fonts the machine happens to have. Names must differ.
+    const inputs = await page.locator('#setup-name, input[id^="opp-name-"]').all();
+    for (const [i, input] of inputs.entries()) await input.fill('W'.repeat(23) + 'ABCDEFGH'[i]);
+  }
   await page.getByRole('button', { name: 'Deal me in' }).click();
   await expect(page.locator('.action-bar')).toBeVisible();
 }
@@ -40,7 +46,7 @@ test('menu loads with the play-money notice and no errors', async ({ page }) => 
 
 test('your own cards are rendered face up and every seat is on screen', async ({ page, isMobile }) => {
   await page.goto('./');
-  await startGame(page);
+  await startGame(page, { longNames: true });
   const stage = page.locator('.stage');
   const orientationBefore = await stage.getAttribute('class');
   // Once it is your turn, the deal and the flip are over (and the action bar has grown).

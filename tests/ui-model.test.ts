@@ -119,7 +119,8 @@ test('layout: content bounds cover every seat, and the scale fits them in the bo
       const layout = computeLayout(n, orientation);
       const b = contentBounds(layout);
       for (const seat of layout.seats) {
-        assert.ok(seat.anchor.x - 85 >= b.left && seat.anchor.x + 85 <= b.right, `${orientation} ${n}: seat plate inside horizontally`);
+        // The widest possible name plate (190 units, whatever the font) must fit.
+        assert.ok(seat.anchor.x - 95 >= b.left && seat.anchor.x + 95 <= b.right, `${orientation} ${n}: seat plate inside horizontally`);
       }
       for (const [w, h] of [[390, 402], [960, 560], [1400, 500], [300, 900]]) {
         const s = fitScale(layout, w!, h!);
