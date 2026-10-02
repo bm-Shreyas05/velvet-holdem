@@ -150,7 +150,23 @@ export interface DifficultySettings {
   anticipatesRaises: boolean;
   /** Account for its own table image. */
   usesImage: boolean;
+  /**
+   * Human-like leaks, as utility biases in pot units (0 = none). Lower levels make the mistakes
+   * real beginners make, so they feel different to play against, not just noisier.
+   */
+  leaks: {
+    /** Calls too often with weak hands (pays off, chases). */
+    sticky: number;
+    /** Checks or calls strong hands instead of betting them (misses value). */
+    passive: number;
+    /** Seldom bets or raises without a hand (gives up on bluffs). */
+    timid: number;
+    /** Bets bigger with stronger hands and smaller with weaker ones (a readable tell). */
+    sizingTell: number;
+  };
 }
+
+const NO_LEAKS = { sticky: 0, passive: 0, timid: 0, sizingTell: 0 };
 
 export const DIFFICULTIES: Record<Difficulty, DifficultySettings> = {
   casual: {
@@ -165,19 +181,21 @@ export const DIFFICULTIES: Record<Difficulty, DifficultySettings> = {
     sizing: 'basic',
     anticipatesRaises: false,
     usesImage: false,
+    leaks: { sticky: 0.22, passive: 0.12, timid: 0.15, sizingTell: 0.25 },
   },
   standard: {
     id: 'standard',
     label: 'Standard',
     blurb: 'Solid fundamentals: pot odds, position and what your betting says about your hand.',
-    samples: 1000,
-    rangeDepth: 0.7,
-    modelWeight: 0.5,
+    samples: 700,
+    rangeDepth: 0.55,
+    modelWeight: 0.4,
     recencyWeight: 0.3,
-    temperature: 0.11,
+    temperature: 0.13,
     sizing: 'standard',
     anticipatesRaises: true,
     usesImage: false,
+    leaks: { sticky: 0.1, passive: 0.06, timid: 0.06, sizingTell: 0.12 },
   },
   pro: {
     id: 'pro',
@@ -191,12 +209,13 @@ export const DIFFICULTIES: Record<Difficulty, DifficultySettings> = {
     sizing: 'full',
     anticipatesRaises: true,
     usesImage: true,
+    leaks: NO_LEAKS,
   },
   elite: {
     id: 'elite',
     label: 'Elite',
     blurb: 'Precise, consistent and exploitative. Same cards and information as you — just sharper.',
-    samples: 3000,
+    samples: 4000,
     rangeDepth: 1,
     modelWeight: 1,
     recencyWeight: 1,
@@ -204,6 +223,7 @@ export const DIFFICULTIES: Record<Difficulty, DifficultySettings> = {
     sizing: 'full',
     anticipatesRaises: true,
     usesImage: true,
+    leaks: NO_LEAKS,
   },
 };
 

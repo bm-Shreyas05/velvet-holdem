@@ -55,6 +55,9 @@ function runSession(
   hands: number,
   onHand?: (h: number, nets: number[]) => void,
 ): { results: SeatResult[]; book: StatsBook; ids: string[] } {
+  // Decks come from their own stream, so a session replayed with the seats swapped deals the
+  // same cards in the same order (duplicate matches) whatever the players decide.
+  const deckRng = new SeededRng(`${seed}:deck`);
   const rng = new SeededRng(seed);
   const book: StatsBook = {};
   const ids = seats.map((_, i) => `s${i}`);
@@ -66,7 +69,7 @@ function runSession(
       button: h % seats.length,
       blinds: { smallBlind: BB / 2, bigBlind: BB, ante: 0 },
     };
-    const { hand } = HoldemHand.start(setup, Deck.shuffled(rng));
+    const { hand } = HoldemHand.start(setup, Deck.shuffled(deckRng));
     let guard = 0;
     while (!hand.isComplete && guard++ < 300) {
       const seat = hand.toAct!;
@@ -103,6 +106,17 @@ function bb100(nets: number[]): { mean: number; ci: number } {
   const variance = perHand.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, perHand.length - 1);
   const se = Math.sqrt(variance / perHand.length);
   return { mean: mean * 100, ci: 1.96 * se * 100 };
+}
+
+/**
+ * A duplicate heads-up match: the same deck sequence twice with the seats swapped, so each
+ * player gets the other's cards and positions. Scoring the average of each pair of hands cancels
+ * most of the card luck, giving a much tighter estimate of the skill difference.
+ */
+function duplicateMatch(seed: string, a: SeatSpec, b: SeatSpec, hands: number): { mean: number; ci: number } {
+  const first = runSession(seed, [a, b], hands).results[0]!.nets;
+  const second = runSession(seed, [b, a], hands).results[1]!.nets;
+  return bb100(first.map((n, i) => (n + second[i]!) / 2));
 }
 
 function fmt(r: { mean: number; ci: number }): string {
@@ -145,24 +159,25 @@ if (run('A')) {
 // ---------------------------------------------------------------------------------------------
 if (run('B')) {
   const hands = N(2000);
-  console.log(`\nB. Difficulty ladder — heads-up, ${hands} hands per match (same style, Shark)`);
+  console.log(`\nB. Difficulty ladder — duplicate heads-up matches, 2 × ${hands} hands each (same style, Shark)`);
   const pairs: [Difficulty, Difficulty][] = [
     ['elite', 'casual'],
+    ['elite', 'pro'],
     ['pro', 'standard'],
     ['standard', 'casual'],
   ];
   for (const [hi, lo] of pairs) {
-    const { results } = runSession(
+    const r = duplicateMatch(
       `eval-B-${hi}-${lo}`,
-      [
-        { label: hi, kind: 'ai', style: 'shark', difficulty: hi },
-        { label: lo, kind: 'ai', style: 'shark', difficulty: lo },
-      ],
+      { label: hi, kind: 'ai', style: 'shark', difficulty: hi },
+      { label: lo, kind: 'ai', style: 'shark', difficulty: lo },
       hands,
     );
-    const r = bb100(results[0]!.nets);
     console.log(`   ${hi.padEnd(8)} vs ${lo.padEnd(8)} ${fmt(r)} for ${hi}`);
-    expect(r.mean > 0, `${hi} beats ${lo}`);
+    // The two strongest levels share the full engine and differ in precision, so the claim
+    // there is only that Elite is not weaker; every other gap must be statistically clear.
+    if (hi === 'elite' && lo === 'pro') expect(r.mean + r.ci > 0, 'Elite is not significantly weaker than Pro');
+    else expect(r.mean - r.ci > 0, `${hi} beats ${lo} significantly`);
   }
 }
 

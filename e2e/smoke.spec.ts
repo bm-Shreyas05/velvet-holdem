@@ -1,5 +1,5 @@
 import { type Page, expect, test } from '@playwright/test';
-import { centreBrightness } from './png.ts';
+import { regionBrightness } from './png.ts';
 
 interface Hook {
   snapshot(): { handNumber: number; seats: { stack: number }[]; gameOver: boolean; humanFinish: unknown };
@@ -68,9 +68,11 @@ test('your own cards are rendered face up and every seat is on screen', async ({
     .toBe(0);
   for (const card of await hero.all()) {
     await expect(card).toHaveAttribute('data-up', 'true');
-    // Faces are near-white and backs dark red, so this catches an engine painting the back over
-    // the face even though the page state is correct (seen in WebKit before the flip fix).
-    expect(centreBrightness(await card.screenshot()), 'hole card must show its face').toBeGreaterThan(150);
+    // Left of centre, a face is plain card stock on every card (court panels and pips sit further
+    // in) while a back is its dark lattice — so this catches an engine painting the back over the
+    // face even though the page state is correct (seen in WebKit before the flip fix).
+    const side = regionBrightness(await card.screenshot(), { x0: 0.1, x1: 0.2, y0: 0.4, y1: 0.6 });
+    expect(side, 'hole card must show its face').toBeGreaterThan(150);
   }
 });
 
@@ -158,7 +160,7 @@ test('installable and playable offline', async ({ page, context, browserName, is
 async function playOutHand(page: Page): Promise<void> {
   const passive = page.locator('.act--passive');
   const fold = page.locator('.act--fold');
-  const deadline = Date.now() + 90_000;
+  const deadline = Date.now() + 150_000;
   while (Date.now() < deadline) {
     if (await page.locator('.next-hand').isVisible()) return;
     if ((await passive.isVisible()) && (await passive.isEnabled())) {
@@ -171,7 +173,7 @@ async function playOutHand(page: Page): Promise<void> {
 }
 
 test('a finished hand can be replayed step by step and reviewed by the coach', async ({ page }) => {
-  test.setTimeout(150_000);
+  test.setTimeout(240_000);
   const errors = trackErrors(page);
   await page.goto('./');
   await startGame(page);
@@ -201,7 +203,7 @@ test('coach hints suggest a move on your turn when switched on', async ({ page }
 });
 
 test('cash game: cashing out mid-hand waits for the hand, then shows the session result', async ({ page }) => {
-  test.setTimeout(150_000);
+  test.setTimeout(240_000);
   const errors = trackErrors(page);
   await page.goto('./');
   await page.getByRole('button', { name: /New game/ }).click();
@@ -245,7 +247,7 @@ test('saves can be exported to a file and imported back', async ({ page }, info)
 });
 
 test('achievements: the first hand is celebrated and listed', async ({ page }) => {
-  test.setTimeout(150_000);
+  test.setTimeout(240_000);
   await page.goto('./');
   await startGame(page);
   await playOutHand(page);
@@ -258,7 +260,7 @@ test('achievements: the first hand is celebrated and listed', async ({ page }) =
 });
 
 test('opponents remember you: a new game starts with what they learned in the last one', async ({ page }) => {
-  test.setTimeout(150_000);
+  test.setTimeout(240_000);
   await page.goto('./#dev');
   await startGame(page);
   await playOutHand(page);

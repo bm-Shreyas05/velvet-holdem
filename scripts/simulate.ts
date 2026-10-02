@@ -2,7 +2,8 @@
  * Stress simulation. Plays very large numbers of hands without human input and fails loudly on
  * any broken invariant.
  *
- *   node scripts/simulate.ts            full run (≈200k engine hands, 400 freeze-outs, 12 AI games)
+ *   node scripts/simulate.ts            full run (≈200k engine hands, 400 freeze-outs, 200 cash
+ *                                       sessions, 12 AI games)
  *   node scripts/simulate.ts --quick    smoke run for CI (a few seconds)
  *   node scripts/simulate.ts --hands 500000 --games 1000 --ai-games 30 --seed my-seed
  *
@@ -11,7 +12,9 @@
  *    cards, legal turn order…). After every hand: the hand is replayed from its recorded deck
  *    and decisions and must reproduce the exact result.
  * 2. Freeze-outs: whole games through TableGame until one player holds every chip.
- * 3. Real games: the full game controller with the real AI and a scripted human.
+ *    Cash games: long sessions with rebuys; every chip at the table must have been bought.
+ * 3. Real games: the full game controller with the real AI and a scripted human, across every
+ *    prize structure and cash games (cashed out after a while).
  */
 import { Deck } from '../src/engine/deck.ts';
 import { TableGame, buildBlindSchedule } from '../src/engine/game.ts';
@@ -20,7 +23,7 @@ import { decisionsFromLog } from '../src/engine/records.ts';
 import { replayHand } from '../src/engine/replay.ts';
 import { SeededRng, randomInt } from '../src/engine/rng.ts';
 import { InlineAiHost } from '../src/ai/host.ts';
-import { defaultSetup } from '../src/game/config.ts';
+import { defaultCashSetup, defaultSetup, PAYOUTS, type PayoutId } from '../src/game/config.ts';
 import { GameController } from '../src/game/controller.ts';
 import { createSession } from '../src/game/session.ts';
 import { randomLegalAction, scriptedAction } from '../src/sim/bots.ts';
@@ -40,7 +43,9 @@ const seed = (() => {
 })();
 const HANDS = opt('hands', quick ? 20000 : 200000);
 const GAMES = opt('games', quick ? 40 : 400);
-const AI_GAMES = opt('ai-games', quick ? 2 : 12);
+const AI_GAMES = opt('ai-games', quick ? 4 : 12);
+const CASH = opt('cash', quick ? 20 : 200);
+const CASH_HANDS = 150;
 
 const failures: string[] = [];
 function fail(message: string): void {
@@ -192,6 +197,51 @@ console.log(`\n2) Freeze-outs: ${GAMES} complete games`);
 }
 
 // ---------------------------------------------------------------------------------------------
+console.log(`\n2b) Cash games: ${CASH} sessions of ${CASH_HANDS} hands with rebuys`);
+{
+  const rng = new SeededRng(`${seed}/cash`);
+  const t0 = performance.now();
+  let hands = 0;
+  let rebuys = 0;
+  const styles = ['random', 'station', 'maniac', 'nit', 'folder'] as const;
+  for (let g = 0; g < CASH; g++) {
+    const n = 2 + randomInt(rng, 5);
+    const buyIn = [200, 500, 1000][randomInt(rng, 3)]!;
+    const game = TableGame.create(
+      { startingStack: buyIn, levels: [{ smallBlind: 5, bigBlind: 10, ante: randomInt(rng, 2) }], handsPerLevel: null, format: 'cash' },
+      Array.from({ length: n }, (_, i) => ({ id: `p${i}`, name: `P${i}` })),
+      randomInt(rng, n),
+    );
+    const buyIns = new Array<number>(n).fill(1);
+    const seatStyle = Array.from({ length: n }, () => styles[randomInt(rng, styles.length)]!);
+    for (let h = 0; h < CASH_HANDS; h++) {
+      for (const seat of game.seatsWithoutChips()) {
+        game.addChips(seat, buyIn);
+        buyIns[seat]!++;
+        rebuys++;
+      }
+      game.startHand(Deck.shuffled(rng));
+      const hand = game.hand!;
+      let steps = 0;
+      while (!hand.isComplete && steps++ < 400) {
+        const seat = hand.toAct!;
+        game.act(seat, scriptedAction(seatStyle[seat]!, hand.legalActions()!, rng, (rng.nextUint32() % 1000) / 1000));
+      }
+      const problems = game.checkInvariants();
+      if (problems.length) fail(`cash ${g} hand ${game.handNumber}: ${problems.join('; ')}`);
+      game.settleHand();
+      hands++;
+      const bought = buyIns.reduce((a, b) => a + b, 0) * buyIn;
+      const atTable = game.players().reduce((s, p) => s + p.stack, 0);
+      if (atTable !== bought || game.totalChips !== bought) fail(`cash ${g}: ${atTable} chips at the table, ${bought} bought`);
+      if (game.isOver || game.players().some((p) => p.eliminated)) fail(`cash ${g}: a player was eliminated`);
+    }
+  }
+  const secs = (performance.now() - t0) / 1000;
+  console.log(`   ${CASH} sessions, ${hands.toLocaleString()} hands, ${rebuys.toLocaleString()} rebuys in ${secs.toFixed(1)} s`);
+}
+
+// ---------------------------------------------------------------------------------------------
 console.log(`\n3) Full games with the real AI: ${AI_GAMES}`);
 {
   const rng = new SeededRng(`${seed}/ai`);
@@ -207,8 +257,22 @@ console.log(`\n3) Full games with the real AI: ${AI_GAMES}`);
     setup.startingStack = 1000;
     setup.structure = 'turbo';
     setup.seed = `${seed}/ai-game-${g}`;
-    const session = createSession(setup);
-    const presenter = new HeadlessPresenter((legal) => randomLegalAction(legal, rng));
+    // Rotate through every prize structure the table size allows, and cash games.
+    const players = setup.opponents.length + 1;
+    const kind = g % 4;
+    const payout = (['winner', 'top2', 'top3'] as PayoutId[])[kind % 3]!;
+    const cash = kind === 3;
+    const game = cash ? { ...defaultCashSetup(setup), seed: setup.seed } : { ...setup, payout: players >= PAYOUTS[payout].minPlayers ? payout : 'winner' };
+    const session = createSession(game);
+    let controller: GameController | null = null;
+    let leaving = false;
+    const presenter = new HeadlessPresenter((legal, snap) => {
+      if (cash && !leaving && snap.handNumber >= 40) {
+        leaving = true;
+        controller!.requestCashOut();
+      }
+      return randomLegalAction(legal, rng);
+    });
     presenter.eliminationChoice = 'skip';
     const host = new InlineAiHost();
     const timed = {
@@ -224,12 +288,13 @@ console.log(`\n3) Full games with the real AI: ${AI_GAMES}`);
     };
     let gameHands = 0;
     const logs: string[] = [];
-    await new GameController(session, presenter, timed, {
+    controller = new GameController(session, presenter, timed, {
       handRecorded: () => gameHands++,
       log: (m) => logs.push(m),
-    }).run();
+    });
+    await controller.run();
     hands += gameHands;
-    if (!presenter.gameOverInfo) fail(`AI game ${g}: did not finish`);
+    if (cash ? !presenter.cashSummary : !presenter.gameOverInfo) fail(`AI game ${g}: did not finish`);
     if (presenter.violations.length) fail(`AI game ${g}: hidden information shown to the player: ${presenter.violations[0]}`);
     if (presenter.notices.some((n) => n.tone === 'error')) fail(`AI game ${g}: ${presenter.notices.find((n) => n.tone === 'error')!.message}`);
     if (logs.length) fail(`AI game ${g}: ${logs[0]}`);

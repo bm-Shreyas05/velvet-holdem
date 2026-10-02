@@ -8,7 +8,7 @@
  * the artwork changes. The artwork is drawn from the same procedural card faces the game uses.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -34,7 +34,17 @@ function findBrowser(): string {
 }
 
 const SPADE = 'M50 18c4 8 26 22 26 38 0 10-7 16-15 16-5 0-8-2-10-5 1 6 3 10 8 13H41c5-3 7-7 8-13-2 3-5 5-10 5-8 0-15-6-15-16 0-16 22-30 26-38Z';
-const DISPLAY = "'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif";
+const DISPLAY = "'Playfair Display', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif";
+
+/** The game's display face, embedded so the images match the page on any machine. */
+function fontFaces(): string {
+  const face = (style: 'normal' | 'italic') => {
+    const file = resolve(root, `node_modules/@fontsource/playfair-display/files/playfair-display-latin-600-${style}.woff2`);
+    const data = readFileSync(file).toString('base64');
+    return `@font-face{font-family:'Playfair Display';font-style:${style};font-weight:600;src:url(data:font/woff2;base64,${data}) format('woff2')}`;
+  };
+  return face('normal') + face('italic');
+}
 const UI = "'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Roboto, Arial, sans-serif";
 
 /** The spade mark. `bleed` fills the whole square (maskable / Apple icons); otherwise a disc on transparency. */
@@ -49,7 +59,7 @@ function iconSvg(bleed: boolean): string {
 }
 
 function page(width: number, height: number, body: string): string {
-  return `<!doctype html><html><head><meta charset="utf-8"><style>
+  return `<!doctype html><html><head><meta charset="utf-8"><style>${fontFaces()}
   html,body{margin:0;width:${width}px;height:${height}px;overflow:hidden;background:transparent}
   </style></head><body>${body}</body></html>`;
 }

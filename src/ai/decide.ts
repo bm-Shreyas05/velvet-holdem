@@ -645,6 +645,14 @@ export function decide(req: DecisionRequest): Decision {
     }
     const riskShare = c.added / stackAtRisk;
     if (riskShare > 0.3) u -= TRAIT.risk * profile.riskAversion * c.added * riskShare * (1 - eqAll);
+    // Difficulty leaks (lower levels only): the habits of weaker players.
+    const leak = diff.leaks;
+    if (isCall) u += scale * leak.sticky * (1 - eqAll);
+    if (c.cls === 'aggressive') {
+      if (eqAll > 0.65) u -= scale * leak.passive;
+      if (eqAll < 0.35) u -= scale * leak.timid;
+      u += scale * leak.sizingTell * (eqAll - 0.5) * Math.min(2, c.added / Math.max(1, pot));
+    }
     c.utility = u;
   }
 
@@ -728,17 +736,19 @@ function sizeTargets(view: HandView, legal: LegalActions, diff: DifficultySettin
     } else {
       const lastRaise = raises[raises.length - 1]!;
       const callersAfter = pre.filter((a) => a.kind === 'call' && pre.indexOf(a) > pre.indexOf(lastRaise)).length;
-      const mult = raises.length === 1 ? (inPosition ? 3 : 3.7) : 2.3;
-      out.push(cb * mult + callersAfter * cb);
+      const mults = raises.length === 1 ? (inPosition ? [3] : [3.7]) : [2.3];
+      // The full menu adds a smaller and a larger re-raise, so sizes do not give hands away.
+      if (diff.sizing === 'full') mults.push(...(raises.length === 1 ? (inPosition ? [2.6, 3.4] : [3.2, 4.3]) : [2.1, 2.6]));
+      for (const mult of mults) out.push(cb * mult + callersAfter * cb);
       allowAllIn = depthBB <= (raises.length === 1 ? 30 : 60);
     }
   } else {
     const spr = effectiveStack / Math.max(1, pot);
     if (cb === 0) {
-      const fracs = diff.sizing === 'basic' ? [0.5, 1] : diff.sizing === 'standard' ? [0.33, 0.66, 1] : [0.33, 0.66, 1, 1.5];
+      const fracs = diff.sizing === 'basic' ? [0.5, 1] : diff.sizing === 'standard' ? [0.33, 0.5, 0.75, 1] : [0.25, 0.33, 0.5, 0.75, 1, 1.5];
       for (const f of fracs) out.push(Math.max(bb, f * pot));
     } else {
-      const fracs = diff.sizing === 'basic' ? [0.8] : diff.sizing === 'standard' ? [0.8] : [0.7, 1.1];
+      const fracs = diff.sizing === 'basic' ? [0.8] : diff.sizing === 'standard' ? [0.8] : [0.6, 0.9, 1.3];
       for (const f of fracs) out.push(cb + f * (pot + legal.toCall));
     }
     allowAllIn = spr <= 3 || (diff.sizing === 'full' && spr <= 5);

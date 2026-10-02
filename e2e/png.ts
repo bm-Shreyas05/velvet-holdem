@@ -51,15 +51,13 @@ export function decodePng(buf: Buffer): { width: number; height: number; channel
   return { width, height, channels, data };
 }
 
-/** Mean brightness (0–255) of the central `fraction` of the image. */
-export function centreBrightness(png: Buffer, fraction = 0.4): number {
+/** Mean brightness (0–255) of a rectangle given as fractions of the image's width and height. */
+export function regionBrightness(png: Buffer, r: { x0: number; x1: number; y0: number; y1: number }): number {
   const { width, height, channels, data } = decodePng(png);
-  const x0 = Math.floor((width * (1 - fraction)) / 2);
-  const y0 = Math.floor((height * (1 - fraction)) / 2);
   let sum = 0;
   let n = 0;
-  for (let y = y0; y < height - y0; y++) {
-    for (let x = x0; x < width - x0; x++) {
+  for (let y = Math.floor(height * r.y0); y < Math.ceil(height * r.y1); y++) {
+    for (let x = Math.floor(width * r.x0); x < Math.ceil(width * r.x1); x++) {
       const i = (y * width + x) * channels;
       sum += (data[i]! + data[i + 1]! + data[i + 2]!) / 3;
       n++;
