@@ -1,4 +1,5 @@
 import { type Card, RANK_CHARS, rankOf, suitOf } from '../engine/cards.ts';
+import { courtFigure } from './courts.ts';
 
 /**
  * Playing-card artwork, generated as SVG so cards stay crisp at every size and no image files
@@ -128,23 +129,6 @@ function corner(rank: number, suit: number, color: string): string {
   return `<g>${text}${pip(suit, 30, 78, 30, color)}</g>`;
 }
 
-function courtPanel(rank: number, suit: number, color: string): string {
-  const letter = RANK_CHARS[rank]!;
-  const frame = '#b58b3b';
-  // King and queen wear a crown, the jack a plumed cap.
-  const crown =
-    rank >= 10
-      ? `<path d="M100 132l12 16 13-22 13 22 12-16-6 30h-38z" fill="${frame}" opacity="0.9"/>`
-      : `<path d="M108 158c2-16 16-24 34-20-6 3-9 8-10 14l6 8h-30z" fill="${frame}" opacity="0.9"/>`;
-  return `
-    <rect x="54" y="54" width="142" height="242" rx="10" fill="${color}" fill-opacity="0.06" stroke="${frame}" stroke-width="3"/>
-    <rect x="62" y="62" width="126" height="226" rx="7" fill="none" stroke="${frame}" stroke-opacity="0.5" stroke-width="1.5"/>
-    ${pip(suit, 125, 96, 34, color)}
-    ${pip(suit, 125, 254, 34, color, true)}
-    ${crown}
-    <text x="125" y="222" text-anchor="middle" font-family="${SERIF}" font-weight="700" font-size="92" fill="${color}">${letter}</text>`;
-}
-
 export function cardFaceSvg(card: Card, style: CardStyle): string {
   const rank = rankOf(card);
   const suit = suitOf(card);
@@ -154,7 +138,7 @@ export function cardFaceSvg(card: Card, style: CardStyle): string {
     center = pip(suit, 125, 175, suit === 3 ? 120 : 100, color);
     if (suit === 3) center += `<circle cx="125" cy="175" r="72" fill="none" stroke="${color}" stroke-opacity="0.18" stroke-width="2"/>`;
   } else if (rank >= 9) {
-    center = courtPanel(rank, suit, color);
+    center = courtFigure(rank, suit, color, style.fourColor, (x, y, size) => pip(suit, x, y, size, color));
   } else {
     const count = rank + 2;
     center = LAYOUTS[count]!.map(([x, y]) => pip(suit, x, y, 44, color, y > 175)).join('');

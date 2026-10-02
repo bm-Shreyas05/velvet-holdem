@@ -101,3 +101,20 @@ test('crypto RNG produces varied output', () => {
   const d2 = Deck.shuffled(rng).snapshot().order;
   assert.notDeepEqual(d1, d2);
 });
+
+test('card art: every face is well-formed SVG and court cards carry their figures', async () => {
+  const { cardFaceSvg, cardBackSvg, CARD_BACKS } = await import('../src/assets/cards.ts');
+  const count = (svg: string, needle: string) => svg.split(needle).length - 1;
+  const balanced = (svg: string, tag: string) => count(svg, `<${tag} `) + count(svg, `<${tag}>`) === count(svg, `</${tag}>`);
+  for (const fourColor of [false, true]) {
+    for (let card = 0; card < 52; card++) {
+      const svg = cardFaceSvg(card, { fourColor });
+      assert.ok(svg.startsWith('<svg') && svg.trimEnd().endsWith('</svg>'), `card ${card}`);
+      for (const tag of ['g', 'svg', 'defs', 'clipPath', 'text']) assert.ok(balanced(svg, tag), `card ${card}: <${tag}> balanced`);
+      assert.ok(!/undefined|NaN/.test(svg), `card ${card}: no undefined values`);
+      const court = Math.floor(card / 4) >= 9 && Math.floor(card / 4) <= 11;
+      assert.equal(svg.includes('clip-path'), court, `card ${card}: court figure ${court ? 'present' : 'absent'}`);
+    }
+  }
+  for (const back of Object.keys(CARD_BACKS) as (keyof typeof CARD_BACKS)[]) assert.ok(!/undefined|NaN/.test(cardBackSvg(back)));
+});

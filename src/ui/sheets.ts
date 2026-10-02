@@ -109,6 +109,16 @@ export function openSettings(app: App, onClose?: () => void): SheetHandle {
     const a = ACHIEVEMENTS.find((x) => (item.felt && x.unlocks?.felt === item.felt) || (item.cardBack && x.unlocks?.cardBack === item.cardBack));
     return a ? `Unlocked by the achievement “${a.title}”: ${a.description}` : 'Locked';
   };
+  const exportBtn = h('button', { type: 'button', class: 'btn btn--small' }, 'Export saves');
+  exportBtn.addEventListener('click', () => app.exportSaves());
+  const importInput = h('input', { type: 'file', accept: '.json,application/json', hidden: true, 'aria-label': 'Backup file to import' }) as HTMLInputElement;
+  importInput.addEventListener('change', () => {
+    const file = importInput.files?.[0];
+    importInput.value = '';
+    if (file) void app.importSaves(file);
+  });
+  const importBtn = h('button', { type: 'button', class: 'btn btn--small' }, 'Import saves…');
+  importBtn.addEventListener('click', () => importInput.click());
   const forget = h('button', { type: 'button', class: 'btn btn--small' }, 'Make opponents forget me');
   forget.addEventListener('click', async () => {
     if (
@@ -305,6 +315,7 @@ export function openSettings(app: App, onClose?: () => void): SheetHandle {
             ? 'Your game and statistics are saved in this browser after every action.'
             : 'This browser is not allowing saved data; nothing will be kept after you close the page.',
         ),
+        h('div', { class: 'data-actions' }, exportBtn, importBtn, importInput),
         reset,
         forget,
       ),
@@ -668,17 +679,20 @@ export function openHelp(app: App, onClose?: () => void): SheetHandle {
         h(
           'p',
           {},
-          'Tournament: everyone starts with the same chips and the blinds rise. When you run out of chips you are out; play continues until one player holds them all. Tournaments can pay only the winner or the top two or three places. When more than one place is paid, chips you might lose are worth more than chips you might win, especially just before the money (“the bubble”) — opponents tighten up there, and so should you.',
+          h('strong', {}, 'Tournament. '),
+          'Everyone starts with the same chips and the blinds rise. When you run out of chips you are out; play continues until one player holds them all. Tournaments can pay only the winner or the top two or three places. When more than one place is paid, chips you might lose are worth more than chips you might win, especially just before the money (“the bubble”) — opponents tighten up there, and so should you.',
         ),
         h(
           'p',
           {},
-          'Cash game: the blinds never change and nobody is eliminated. If you run out of chips you can buy in again. Cash out whenever you like from the pause menu; your result is what you leave with minus what you bought in for.',
+          h('strong', {}, 'Cash game. '),
+          'The blinds never change and nobody is eliminated. If you run out of chips you can buy in again. Cash out whenever you like from the pause menu; your result is what you leave with minus what you bought in for.',
         ),
         h(
           'p',
           {},
-          'Daily challenge: one tournament per day, the same opponents and the same deck for every hand number for everyone. Your first game of the day counts for your record and streak; replays are practice.',
+          h('strong', {}, 'Daily challenge. '),
+          'One tournament per day, the same opponents and the same deck for every hand number for everyone. Your first game of the day counts for your record and streak; replays are practice.',
         ),
       ),
       h(
@@ -702,6 +716,21 @@ export function openHelp(app: App, onClose?: () => void): SheetHandle {
           'p',
           {},
           'Every opponent uses the same decision engine and sees exactly what a player in their seat would see: their own cards, the board, the bets, and any hands shown down. They learn your habits from what you do at the table, and adjust as they gather evidence.',
+        ),
+      ),
+      h(
+        'section',
+        {},
+        h('h3', {}, 'Getting better'),
+        h(
+          'p',
+          {},
+          'Open any hand in the hand history to replay it on the table, step by step, exactly as you saw it. “Review with coach” has the strongest AI setting look at each of your decisions from the same view you had: your equity against their likely hands, what a call needed, and what each option was worth.',
+        ),
+        h(
+          'p',
+          {},
+          'Turn on coach hints in Settings to see the coach’s suggestion on your turn while you learn — and turn them off for a fair test. Achievements mark milestones, and some unlock new table felts and card backs.',
         ),
       ),
       h(
@@ -894,7 +923,9 @@ export function openAchievements(app: App, onClose?: () => void): SheetHandle {
     ...ACHIEVEMENTS.map((a) => {
       const when = p.achievements[a.id];
       const hidden = a.secret && !when;
-      const reward = a.unlocks?.felt ? `Unlocks the ${a.unlocks.felt} table felt` : a.unlocks?.cardBack ? `Unlocks the ${a.unlocks.cardBack} card back` : '';
+      const feltName = FELTS.find((f) => f.value === a.unlocks?.felt)?.label;
+      const backName = CARD_BACK_CHOICES.find((c) => c.value === a.unlocks?.cardBack)?.label;
+      const reward = feltName ? `Unlocks the ${feltName} table felt` : backName ? `Unlocks the ${backName} card back` : '';
       return h(
         'li',
         { class: `achievement ${when ? 'is-earned' : 'is-locked'}` },

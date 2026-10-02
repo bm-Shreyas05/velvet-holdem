@@ -34,7 +34,7 @@ jobs:
     name: Browser tests (Chromium, Firefox, WebKit, phones)
     # Pinned so Playwright's system-dependency installer knows the distribution.
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

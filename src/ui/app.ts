@@ -6,6 +6,7 @@ import { emptyStats as emptyModelStats, observeHand } from '../ai/model.ts';
 import { DIFFICULTIES } from '../ai/profiles.ts';
 import type { HandSettlement } from '../engine/game.ts';
 import type { PublicHandRecord } from '../engine/records.ts';
+import { applyBackup, exportBackup, readBackup } from '../game/backup.ts';
 import { dailySetup, type NewGameSetup, PAYOUTS, payoutsFor, todayKey } from '../game/config.ts';
 import { type CashSummary, GameController, type GameOverInfo, type TableSnapshot } from '../game/controller.ts';
 import type { HandHistoryRecord } from '../game/history.ts';
@@ -20,6 +21,7 @@ import {
   unlock,
 } from '../game/progress.ts';
 import { adviceText } from '../game/review.ts';
+import { browserStore } from '../game/persistence.ts';
 import { createSession, type SessionData } from '../game/session.ts';
 import { SPEEDS, type Settings } from '../game/settings.ts';
 import { recordCashSession, recordFinish, recordHand } from '../game/stats.ts';
@@ -536,6 +538,59 @@ export class App {
       styleOf: (name) => styles.get(name) ?? null,
       review,
     });
+  }
+
+  /** Downloads every save as one file (Settings → Data). */
+  exportSaves(): void {
+    this.#saveNow();
+    const store = browserStore();
+    if (!store) {
+      toast('This browser is not allowing saved data, so there is nothing to export.', 'warning');
+      return;
+    }
+    const url = URL.createObjectURL(new Blob([exportBackup(store)], { type: 'application/json' }));
+    const link = h('a', { href: url, download: `velvet-saves-${todayKey()}.json` });
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    toast('Saves exported. Keep the file to restore them later or on another device.');
+  }
+
+  /** Replaces every save with a verified backup, then reloads (Settings → Data). */
+  async importSaves(file: File): Promise<void> {
+    const store = browserStore();
+    if (!store) {
+      toast('This browser is not allowing saved data, so a backup cannot be imported here.', 'warning');
+      return;
+    }
+    if (file.size > 20_000_000) {
+      toast('That file is far too large to be a Velvet backup.', 'error');
+      return;
+    }
+    let text: string;
+    try {
+      text = await file.text();
+    } catch {
+      toast('That file could not be read.', 'error');
+      return;
+    }
+    const check = readBackup(text);
+    if (!check.ok) {
+      toast(`Nothing was imported: ${check.reason}.`, 'error', 6000);
+      return;
+    }
+    const when = check.exportedAt ? new Date(check.exportedAt).toLocaleString() : 'an unknown date';
+    const ok = await confirm(
+      'Replace your saves?',
+      `This backup from ${when} contains ${check.summary.join(', ') || 'your settings'}. It will replace everything saved in this browser, including any game in progress.`,
+      'Replace and reload',
+      true,
+    );
+    if (!ok) return;
+    this.#leaveTable(); // stop the game first, so it cannot save over the imported data
+    applyBackup(store, check.entries);
+    location.reload();
   }
 
   /** Counts a completed coach review (towards an achievement). */

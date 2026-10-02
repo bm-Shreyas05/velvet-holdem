@@ -226,3 +226,51 @@ test('daily challenge: today’s table starts from the menu and is marked as the
   await expect(page.locator('.info-daily')).toHaveText(/^Daily \d{4}-\d{2}-\d{2}$/);
   await expect(page.locator('.action-bar')).toBeVisible();
 });
+
+test('saves can be exported to a file and imported back', async ({ page }, info) => {
+  test.skip(info.project.name !== 'chromium' && info.project.name !== 'webkit', 'file round trip checked on desktop engines');
+  await page.goto('./');
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('radio', { name: 'Navy' }).click();
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export saves' }).click()]);
+  const file = await download.path();
+  expect(download.suggestedFilename()).toMatch(/^velvet-saves-\d{4}-\d{2}-\d{2}\.json$/);
+  // Change the setting, then restore the backup: the import replaces it.
+  await page.getByRole('radio', { name: 'Claret' }).first().click();
+  await page.locator('input[type=file]').setInputFiles(file);
+  await page.getByRole('button', { name: 'Replace and reload' }).click();
+  await page.waitForLoadState('load');
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await expect(page.getByRole('radio', { name: 'Navy' })).toHaveAttribute('aria-checked', 'true');
+});
+
+test('achievements: the first hand is celebrated and listed', async ({ page }) => {
+  test.setTimeout(150_000);
+  await page.goto('./');
+  await startGame(page);
+  await playOutHand(page);
+  await expect(page.getByText(/Achievement: Shuffle up and deal/)).toBeVisible({ timeout: 10_000 });
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Leave table' }).click();
+  await page.getByRole('button', { name: 'Achievements' }).click();
+  await expect(page.getByText(/^\d+ of \d+ earned/)).toBeVisible();
+  await expect(page.locator('.achievement.is-earned', { hasText: 'Shuffle up and deal' })).toBeVisible();
+});
+
+test('opponents remember you: a new game starts with what they learned in the last one', async ({ page }) => {
+  test.setTimeout(150_000);
+  await page.goto('./#dev');
+  await startGame(page);
+  await playOutHand(page);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Leave table' }).click();
+  await page.getByRole('button', { name: /New game/ }).click();
+  await page.getByRole('button', { name: 'Deal me in' }).click();
+  await page.getByRole('button', { name: 'Start new game' }).click();
+  await expect(page.locator('.action-bar')).toBeVisible();
+  const known = await page.evaluate(() => {
+    const s = (window as unknown as { __velvet: { session(): { statsBook: Record<string, { hands: number }> } } }).__velvet.session();
+    return s.statsBook.human?.hands ?? 0;
+  });
+  expect(known, 'hands the opponents already know about').toBeGreaterThan(0);
+});

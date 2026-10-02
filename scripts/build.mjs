@@ -31,7 +31,7 @@ const app = await build({
   format: 'iife',
   define: { __AI_WORKER_SOURCE__: JSON.stringify(workerCode) },
 });
-const css = await build({ ...common, entryPoints: ['src/styles/main.css'], loader: { '.css': 'css' } });
+const css = await build({ ...common, entryPoints: ['src/styles/main.css'], loader: { '.css': 'css', '.woff2': 'dataurl' } });
 
 const js = app.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
 const styles = css.outputFiles[0].text;
