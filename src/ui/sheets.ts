@@ -5,12 +5,18 @@ import { cardFaceUrl } from '../assets/cards.ts';
 import { STYLES } from '../ai/profiles.ts';
 import type { GameOverInfo, TableSnapshot } from '../game/controller.ts';
 import { type HandHistoryRecord, actionText, historyToText } from '../game/history.ts';
-import { type Felt, type Settings, SPEEDS, type Speed, UI_SCALES } from '../game/settings.ts';
+import { BUY_IN_POINTS, todayKey } from '../game/config.ts';
+import type { CashSummary } from '../game/controller.ts';
+import { ACHIEVEMENTS, dailyShareText, dailyStreak, unlockedCosmetics } from '../game/progress.ts';
+import { CARD_BACK_CHOICES, type CardBack, FELTS, type Felt, type Settings, SPEEDS, type Speed, UI_SCALES } from '../game/settings.ts';
 import { type CareerStats, type PlayerStats, derive, emptyCareer } from '../game/stats.ts';
 import type { App } from './app.ts';
 import { confirm, openSheet, type SheetHandle, toast } from './dialogs.ts';
 import { clear, h } from './dom.ts';
 import { chips, ordinal, pct, signed } from './format.ts';
+
+/** Progress shown in the statistics sheet (loaded when the sheet opens). */
+let progress: ReturnType<App['storage']['loadProgress']> | null = null;
 
 function miniCards(cards: Card[], fourColor: boolean): HTMLElement {
   return h(
@@ -48,7 +54,7 @@ export function openSettings(app: App, onClose?: () => void): SheetHandle {
   };
   const segmented = <T extends string | number>(
     label: string,
-    options: { value: T; label: string }[],
+    options: { value: T; label: string; locked?: string }[],
     get: (s: Settings) => T,
     set: (s: Settings, v: T) => void,
   ) => {
@@ -56,8 +62,23 @@ export function openSettings(app: App, onClose?: () => void): SheetHandle {
     const render = () =>
       group.replaceChildren(
         ...options.map((o) => {
-          const b = h('button', { type: 'button', role: 'radio', class: 'seg', 'aria-checked': String(get(s()) === o.value) }, o.label);
+          const b = h(
+            'button',
+            {
+              type: 'button',
+              role: 'radio',
+              class: `seg ${o.locked ? 'seg--locked' : ''}`,
+              'aria-checked': String(get(s()) === o.value),
+              'aria-disabled': o.locked ? 'true' : undefined,
+              title: o.locked ?? undefined,
+            },
+            o.locked ? `🔒 ${o.label}` : o.label,
+          );
           b.addEventListener('click', () => {
+            if (o.locked) {
+              toast(o.locked, 'info');
+              return;
+            }
             app.updateSettings((x) => set(x, o.value));
             render();
           });
@@ -82,6 +103,23 @@ export function openSettings(app: App, onClose?: () => void): SheetHandle {
     ['M', 'Mute or unmute'],
   ];
 
+  const progress = app.storage.loadProgress();
+  const unlocked = unlockedCosmetics(progress);
+  const lockHint = (item: { felt?: Felt; cardBack?: CardBack }) => {
+    const a = ACHIEVEMENTS.find((x) => (item.felt && x.unlocks?.felt === item.felt) || (item.cardBack && x.unlocks?.cardBack === item.cardBack));
+    return a ? `Unlocked by the achievement “${a.title}”: ${a.description}` : 'Locked';
+  };
+  const forget = h('button', { type: 'button', class: 'btn btn--small' }, 'Make opponents forget me');
+  forget.addEventListener('click', async () => {
+    if (
+      await confirm('Start fresh with opponents?', 'Opponents will forget how you have played in earlier games. Your statistics are not affected.', 'Forget')
+    ) {
+      const p = app.storage.loadProgress();
+      p.reputation = null;
+      app.storage.write(app.storage.progress, p);
+      toast('Opponents will treat you as a stranger in your next game');
+    }
+  });
   const reset = h('button', { type: 'button', class: 'btn btn--danger btn--small' }, 'Reset lifetime statistics');
   reset.addEventListener('click', async () => {
     if (
@@ -176,6 +214,20 @@ export function openSettings(app: App, onClose?: () => void): SheetHandle {
           (x, v) => (x.gameplay.alwaysShowCards = v),
           'Off: beaten hands are mucked, as most players do. Opponents learn from what you show.',
         ),
+        toggle(
+          'set-remember',
+          'Opponents remember how I play',
+          (x) => x.gameplay.opponentsRemember,
+          (x, v) => (x.gameplay.opponentsRemember = v),
+          'New games start with what opponents learned about you before. Never used in the daily challenge.',
+        ),
+        toggle(
+          'set-coach',
+          'Coach hints on my turn',
+          (x) => x.gameplay.coachHints,
+          (x, v) => (x.gameplay.coachHints = v),
+          'Shows what the coach would do, with its equity estimate. Off for a fair test of your skill.',
+        ),
       ),
       h(
         'section',
@@ -199,20 +251,13 @@ export function openSettings(app: App, onClose?: () => void): SheetHandle {
         ),
         segmented<Felt>(
           'Table felt',
-          [
-            { value: 'emerald', label: 'Emerald' },
-            { value: 'navy', label: 'Navy' },
-            { value: 'claret', label: 'Claret' },
-          ],
+          FELTS.map((f) => ({ ...f, locked: unlocked.felts.has(f.value) ? undefined : lockHint({ felt: f.value }) })),
           (x) => x.display.felt,
           (x, v) => (x.display.felt = v),
         ),
-        segmented(
+        segmented<CardBack>(
           'Card backs',
-          [
-            { value: 'claret', label: 'Claret' },
-            { value: 'midnight', label: 'Midnight' },
-          ] as const,
+          CARD_BACK_CHOICES.map((c) => ({ ...c, locked: unlocked.cardBacks.has(c.value) ? undefined : lockHint({ cardBack: c.value }) })),
           (x) => x.display.cardBack,
           (x, v) => (x.display.cardBack = v),
         ),
@@ -261,6 +306,7 @@ export function openSettings(app: App, onClose?: () => void): SheetHandle {
             : 'This browser is not allowing saved data; nothing will be kept after you close the page.',
         ),
         reset,
+        forget,
       ),
     ),
   );
@@ -354,6 +400,19 @@ function statsBody(stats: PlayerStats, fourColor: boolean, career?: CareerStats)
             .map(([place, n]) => `${ordinal(Number(place))} ×${n}`)
             .join(' · ') || '—',
         ),
+        tile(
+          'Prize points',
+          signed(career.prizePoints - career.gamesPlayed * BUY_IN_POINTS),
+          `${chips(career.prizePoints)} won from ${chips(career.gamesPlayed * BUY_IN_POINTS)} in entries · paid ${career.cashes}×`,
+        ),
+        tile(
+          'Cash games',
+          career.cashSessions ? `${signed(Math.round(career.cashNetBB))} BB` : '—',
+          career.cashSessions
+            ? `${career.cashSessions} sessions · ${chips(career.cashHands)} hands · ${career.cashHands ? ((career.cashNetBB / career.cashHands) * 100).toFixed(1) : '0'} BB/100`
+            : 'Net result in big blinds',
+        ),
+        tile('Daily streak', progress ? String(dailyStreak(progress, todayKey())) : '—', 'Days in a row with a finished daily challenge'),
       )
     : null;
   return h(
@@ -369,6 +428,7 @@ function statsBody(stats: PlayerStats, fourColor: boolean, career?: CareerStats)
 
 export function openStats(app: App, session: PlayerStats | null, onClose?: () => void): SheetHandle {
   const career = app.storage.loadCareer();
+  progress = app.storage.loadProgress();
   const fourColor = app.settings.display.fourColorDeck;
   const body = h('div', {});
   const tabs = h('div', { class: 'tabs', role: 'tablist' });
@@ -596,7 +656,26 @@ export function openHelp(app: App, onClose?: () => void): SheetHandle {
           {},
           'If more than one player is left after the river, hands are shown and the best hand wins. When someone is all-in for less, the extra chips form side pots that only the players who matched them can win. Equal hands split the pot.',
         ),
-        h('p', {}, 'This is a freeze-out: when you run out of chips you are out. The last player with chips wins.'),
+      ),
+      h(
+        'section',
+        {},
+        h('h3', {}, 'Ways to play'),
+        h(
+          'p',
+          {},
+          'Tournament: everyone starts with the same chips and the blinds rise. When you run out of chips you are out; play continues until one player holds them all. Tournaments can pay only the winner or the top two or three places. When more than one place is paid, chips you might lose are worth more than chips you might win, especially just before the money (“the bubble”) — opponents tighten up there, and so should you.',
+        ),
+        h(
+          'p',
+          {},
+          'Cash game: the blinds never change and nobody is eliminated. If you run out of chips you can buy in again. Cash out whenever you like from the pause menu; your result is what you leave with minus what you bought in for.',
+        ),
+        h(
+          'p',
+          {},
+          'Daily challenge: one tournament per day, the same opponents and the same deck for every hand number for everyone. Your first game of the day counts for your record and streak; replays are practice.',
+        ),
       ),
       h(
         'section',
@@ -665,12 +744,26 @@ export function openPauseMenu(app: App, resume: () => void): SheetHandle {
       btn('Statistics', () => app.openStats()),
       btn('Settings', () => app.openSettings()),
       btn('How to play', () => app.openHelp()),
+      app.inCashGame
+        ? btn('Cash out', () => {
+            leaving = true;
+            sheet.close();
+            resume();
+            app.cashOut();
+          })
+        : null,
       btn('Leave table', () => {
         leaving = true;
         sheet.close();
         app.quitToMenu();
       }),
-      h('p', { class: 'fine' }, 'Your game is saved after every action. Leave any time and continue later from the main menu.'),
+      h(
+        'p',
+        { class: 'fine' },
+        app.inCashGame
+          ? 'Cash out to end the session and count your result. Leave the table to take a break and continue later from the main menu.'
+          : 'Your game is saved after every action. Leave any time and continue later from the main menu.',
+      ),
     ),
   );
   return sheet;
@@ -715,6 +808,18 @@ export function openGameOver(app: App, data: { title: string; info: GameOverInfo
         ? `You took every chip in ${chips(info.hands)} hands.`
         : `You finished ${ordinal(info.humanPlace)} of ${info.fieldSize}. The game lasted ${chips(info.hands)} hands.`,
     ),
+    info.prizes.length > 1 || info.humanPrize > 0
+      ? h(
+          'p',
+          { class: 'sheet-message prize-line' },
+          info.humanPrize > 0
+            ? `You won ${chips(info.humanPrize)} prize points (entry ${BUY_IN_POINTS}).`
+            : `No prize this time — ${info.prizes.length > 1 ? `the top ${info.prizes.length} were paid` : 'only the winner is paid'}.`,
+          ' ',
+          h('span', { class: 'muted' }, `Prizes: ${info.prizes.map((p, i) => `${ordinal(i + 1)} ${chips(p)}`).join(' · ')}`),
+        )
+      : '',
+    dailyNote(app, snapshot),
     list,
     summary ?? '',
     h('div', { class: 'sheet-actions' }, review, menu, setup, again),
@@ -726,6 +831,117 @@ export function openGameOver(app: App, data: { title: string; info: GameOverInfo
   setup.addEventListener('click', () => {
     sheet.close();
     app.showSetup();
+  });
+  menu.addEventListener('click', () => {
+    sheet.close();
+    app.showMenu();
+  });
+  review.addEventListener('click', () => app.openHistory());
+  return sheet;
+}
+
+/** After a daily challenge: the official result, streak, and a shareable summary. */
+function dailyNote(app: App, snapshot: TableSnapshot): HTMLElement | string {
+  const date = snapshot.daily;
+  if (!date) return '';
+  const p = app.storage.loadProgress();
+  const result = p.daily[date];
+  const official = result && result.attempts === 1 && p.dailyStarted[date];
+  const streak = dailyStreak(p, date);
+  const box = h('div', { class: 'daily-note' });
+  if (!result) {
+    box.append(h('p', { class: 'sheet-message' }, 'Practice game — your first game today is the one that counts.'));
+    return box;
+  }
+  box.append(
+    h(
+      'p',
+      { class: 'sheet-message' },
+      official ? `Daily challenge ${date} recorded.` : `Practice game. Your result for ${date} stays ${ordinal(result.place)}.`,
+      streak > 1 ? ` Streak: ${streak} days.` : '',
+    ),
+  );
+  const share = h('button', { type: 'button', class: 'btn btn--small' }, 'Share result');
+  share.addEventListener('click', async () => {
+    const text = dailyShareText(date, result, streak, location.href.split('#')[0]!.split('?')[0]!);
+    try {
+      if (navigator.share) await navigator.share({ text });
+      else {
+        await navigator.clipboard.writeText(text);
+        toast('Result copied — paste it anywhere');
+      }
+    } catch {
+      /* the share sheet was dismissed */
+    }
+  });
+  box.append(share);
+  return box;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Achievements
+
+export function openAchievements(app: App, onClose?: () => void): SheetHandle {
+  const p = app.storage.loadProgress();
+  const earned = ACHIEVEMENTS.filter((a) => p.achievements[a.id]).length;
+  const list = h(
+    'ul',
+    { class: 'achievements' },
+    ...ACHIEVEMENTS.map((a) => {
+      const when = p.achievements[a.id];
+      const hidden = a.secret && !when;
+      const reward = a.unlocks?.felt ? `Unlocks the ${a.unlocks.felt} table felt` : a.unlocks?.cardBack ? `Unlocks the ${a.unlocks.cardBack} card back` : '';
+      return h(
+        'li',
+        { class: `achievement ${when ? 'is-earned' : 'is-locked'}` },
+        h('span', { class: 'ach-mark', 'aria-hidden': 'true' }, when ? '★' : '☆'),
+        h(
+          'span',
+          { class: 'ach-text' },
+          h('strong', {}, hidden ? 'Secret achievement' : a.title),
+          h('span', { class: 'ach-desc' }, hidden ? 'Keep playing to discover it.' : a.description),
+          reward && !hidden ? h('span', { class: 'ach-reward' }, reward) : null,
+        ),
+        h('span', { class: 'ach-date' }, when ? new Date(when).toLocaleDateString() : ''),
+      );
+    }),
+  );
+  return openSheet(
+    { title: 'Achievements', wide: true, onClose },
+    h('p', { class: 'sheet-message' }, `${earned} of ${ACHIEVEMENTS.length} earned. Some unlock new table felts and card backs (Settings → Display).`),
+    list,
+  );
+}
+
+// ---------------------------------------------------------------------------------------------
+// Cash game summary
+
+export function openCashSummary(app: App, s: CashSummary): SheetHandle {
+  const bb = (n: number) => `${signed(Math.round((n / Math.max(1, s.bigBlind)) * 10) / 10)} BB`;
+  const per100 = s.hands > 0 ? (s.net / Math.max(1, s.bigBlind) / s.hands) * 100 : 0;
+  const rows: [string, string][] = [
+    ['Hands played', chips(s.hands)],
+    ['Bought in for', `${chips(s.buyIn * s.buyIns)}${s.buyIns > 1 ? ` (${s.buyIns} buy-ins)` : ''}`],
+    ['Cashed out', chips(s.finalStack)],
+    ['Result', `${signed(s.net)} chips · ${bb(s.net)}`],
+    ['Win rate', s.hands ? `${per100 >= 0 ? '+' : ''}${per100.toFixed(1)} BB per 100 hands` : '—'],
+  ];
+  const again = h('button', { type: 'button', class: 'btn btn--primary' }, 'New session');
+  const menu = h('button', { type: 'button', class: 'btn' }, 'Main menu');
+  const review = h('button', { type: 'button', class: 'btn' }, 'Review hands');
+  const sheet = openSheet(
+    { title: s.net > 0 ? 'Nice session' : s.net < 0 ? 'Session over' : 'Broke even', modal: true, className: s.net > 0 ? 'sheet--victory' : '' },
+    h(
+      'p',
+      { class: 'result-line' },
+      s.net > 0 ? `You left ${chips(s.net)} ahead.` : s.net < 0 ? `You left ${chips(-s.net)} down.` : 'You left with exactly what you brought.',
+    ),
+    h('dl', { class: 'summary-list' }, ...rows.flatMap(([k, v]) => [h('dt', {}, k), h('dd', {}, v)])),
+    h('div', { class: 'sheet-actions' }, review, menu, again),
+  );
+  again.addEventListener('click', () => {
+    sheet.close();
+    app.playAgain();
   });
   menu.addEventListener('click', () => {
     sheet.close();

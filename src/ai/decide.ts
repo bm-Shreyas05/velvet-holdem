@@ -6,6 +6,7 @@ import { COMBO_A, COMBO_B, COMBO_COUNT, cardMask, comboConflicts, hasCard } from
 import { type StatKey, type StatsBook, type Tendencies, confidence, estimate, populationPrior, tendencies } from './model.ts';
 import { DIFFICULTIES, type Difficulty, type DifficultySettings, type PersonalityProfile, STYLES, type StyleId } from './profiles.ts';
 import { buildRange, massBelow, weightedQuantile } from './ranges.ts';
+import { bubbleFactor, icmMatters } from './icm.ts';
 import { boardStrength, boardWetness } from './strength.ts';
 
 /**
@@ -31,6 +32,16 @@ export interface DecisionRequest {
   tilt: number;
   /** Seed for this decision's own randomness (never related to the deck). */
   seed: SeedState;
+  /**
+   * Tournament prize fractions for 1st, 2nd, … When more than one place is paid, chips lost are
+   * worth more than chips won (ICM) and the engine plays accordingly. Omitted in cash games.
+   */
+  payouts?: number[];
+  /**
+   * Extra actions to price alongside the engine's own options (used by the coach to evaluate the
+   * exact amount a player chose). They appear in debug.candidates; AI play never sets this.
+   */
+  evaluate?: PlayerAction[];
 }
 
 export interface CandidateEval {
@@ -286,6 +297,8 @@ export function decide(req: DecisionRequest): Decision {
   const legal = view.legal;
   const me = view.viewer;
   if (!legal || me === null || view.toAct !== me) throw new Error("decide() was called when it is not this player's turn");
+  /** The deciding seat, narrowed for use inside nested functions. */
+  const self: number = me;
   const mine = view.seats[me]!;
   const hole = mine.holeCards;
   if (hole?.length !== 2) throw new Error('The deciding player has no hole cards');
@@ -300,6 +313,19 @@ export function decide(req: DecisionRequest): Decision {
   const tableSize = seatsIn.length;
   const opps: SeatView[] = view.seats.filter((s) => s.inHand && !s.folded && s.seat !== me);
   const tilt = clamp(req.tilt, 0, 1) * profile.tiltProne;
+
+  // Tournament prize equity. Stacks at the start of the hand describe each player's standing; a
+  // bubble factor above 1 means losing a confrontation costs more prize equity than winning it
+  // gains, so the losing side of every option is scaled up (and opponents need more to call).
+  const icmPayouts = icmMatters(req.payouts) ? req.payouts : null;
+  const icmIndex = new Map(seatsIn.map((s, i) => [s.seat, i]));
+  const icmStacks = seatsIn.map((s) => s.startStack);
+  const bubble = (player: number, opponent: number | undefined, risk: number): number => {
+    if (!icmPayouts || opponent === undefined) return 1;
+    const a = icmIndex.get(player);
+    const b = icmIndex.get(opponent);
+    return a === undefined || b === undefined ? 1 : bubbleFactor(icmStacks, icmPayouts, a, b, risk);
+  };
 
   const modelWeight = diff.modelWeight * (0.4 + 0.6 * profile.adaptivity);
   const tendCache = new Map<number, Tendencies>();
@@ -341,10 +367,21 @@ export function decide(req: DecisionRequest): Decision {
   const bb = legal.bigBlind;
   const myCommit = legal.streetCommit;
   const myTotal = myCommit + legal.stack;
-  const scale = Math.max(pot, 2 * bb);
+  // Size of the decision, for personality and consistency scaling: the chips this player can
+  // actually contest (an over-shove's excess beyond its stack is not at stake).
+  let contestable = 0;
+  for (const s of view.seats) if (s.inHand) contestable += Math.min(s.totalCommit, mine.totalCommit + legal.stack);
+  const scale = Math.max(contestable, 2 * bb);
   const nSeats = view.seats.length;
   const inPosition = opps.every((o) => orderKey(me, view.button, nSeats) > orderKey(o.seat, view.button, nSeats));
   const streetActions = view.actions.filter((a) => a.street === street);
+  // The opponent this decision is mostly against: whoever made the bet being faced, otherwise
+  // the deepest stack still in the hand.
+  const lastAggressor = [...view.actions].reverse().find((a) => (a.kind === 'bet' || a.kind === 'raise') && a.seat !== me)?.seat;
+  const mainOpponent =
+    lastAggressor !== undefined && opps.some((o) => o.seat === lastAggressor)
+      ? lastAggressor
+      : opps.reduce<SeatView | undefined>((best, o) => (!best || o.startStack > best.startStack ? o : best), undefined)?.seat;
   const raiseCount = streetActions.filter((a) => a.kind === 'bet' || a.kind === 'raise').length;
   const wetness = boardWetness(board);
 
@@ -376,11 +413,23 @@ export function decide(req: DecisionRequest): Decision {
     const r = noFuture ? 1 : realization(eqAll, streetsLeft, inPosition, opps.length);
     const behind = noFuture ? 0 : Math.min(legal.stack - legal.toCall, biggestOpponentStack);
     const waiting = opps.filter((o) => !o.allIn && o.streetCommit < legal.currentBet && o.seat !== streetActions.at(-1)?.seat).length;
+    // The losing part of a call (the chips put in when behind) weighs more under ICM pressure.
+    const lossPart = legal.toCall * (1 - r * eqAll);
+    const icmPenalty = (bubble(me, mainOpponent, mine.totalCommit + legal.toCall) - 1) * lossPart;
+    // An all-in call can only win from each player as much as it puts in itself; the rest of an
+    // over-shove comes back uncalled and is not part of the pot this call contests.
+    let winnable = pot + legal.toCall;
+    if (legal.callIsAllIn) {
+      const myTotalAfter = mine.totalCommit + legal.toCall;
+      winnable = 0;
+      for (const s of view.seats) if (s.inHand) winnable += Math.min(s.seat === me ? myTotalAfter : s.totalCommit, myTotalAfter);
+    }
     const ev =
-      r * eqAll * (pot + legal.toCall) -
+      r * eqAll * winnable -
       legal.toCall +
       impliedValue(eqAll, behind, pot + 2 * legal.toCall, streetsLeft, inPosition, 0.8 * rangeExtraction) -
-      0.04 * pot * waiting * (1 - eqAll);
+      0.04 * pot * waiting * (1 - eqAll) -
+      icmPenalty;
     candidates.push({ label: `call ${legal.toCall}`, action: { kind: 'call' }, cls: 'passive', ev, utility: 0, added: legal.toCall });
   }
   if (legal.canFold) candidates.push({ label: 'fold', action: { kind: 'fold' }, cls: 'fold', ev: 0, utility: 0, added: 0 });
@@ -401,6 +450,14 @@ export function decide(req: DecisionRequest): Decision {
       const ev = aggressionEv(to);
       const label = to === legal.maxTo ? 'all-in' : `${legal.aggression} ${to}`;
       candidates.push({ label, action: { kind: legal.aggression, to }, cls: 'aggressive', ev, utility: 0, added: to - myCommit });
+    }
+    for (const extra of req.evaluate ?? []) {
+      if (extra.kind !== legal.aggression || typeof extra.to !== 'number') continue;
+      const to = Math.round(clamp(extra.to, legal.minTo, legal.maxTo));
+      if (seen.has(to)) continue;
+      seen.add(to);
+      const label = to === legal.maxTo ? 'all-in' : `${legal.aggression} ${to}`;
+      candidates.push({ label, action: { kind: legal.aggression, to }, cls: 'aggressive', ev: aggressionEv(to), utility: 0, added: to - myCommit });
     }
   }
 
@@ -451,7 +508,10 @@ export function decide(req: DecisionRequest): Decision {
       // bet represents at the price offered; habitual folders need more, stations less.
       const potAfter = pot + add + callAdd[j]!;
       const othersBehind = opps.filter((x) => x.seat !== o.seat && !x.allIn).length;
-      const price = (callAdd[j]! / potAfter) * (1 + 0.08 * othersBehind);
+      // Breakeven equity for the caller; under ICM pressure (bubble factor > 1) they need more.
+      const bfOpp = bubble(o.seat, self, o.totalCommit + callAdd[j]!);
+      const lose = bfOpp * callAdd[j]!;
+      const price = (lose / (potAfter - callAdd[j]! + lose)) * (1 + 0.08 * othersBehind);
       let threshold = continueThreshold(price, perceived(add));
       threshold += 0.6 * foldShift(o, add) + 0.06 * profile.bluffing + imageAdj;
       threshold = clamp(threshold, 0, 0.995);
@@ -531,11 +591,12 @@ export function decide(req: DecisionRequest): Decision {
     const potIfReraised = pot + (reraiseTo - myCommit) + (reraiseTo - Math.min(...opps.map((o) => o.streetCommit)));
     const continueVsRaise = eqRaised * potIfReraised >= reraiseTo - to;
 
-    // Pass 2: expected value.
-    let total = 0;
+    // Pass 2: expected value, kept as what is won and what is lost so ICM can weigh losses.
+    let gain = 0;
+    let loss = 0;
     for (let k = 0; k < n; k++) {
       if (!anyCaller[k]) {
-        total += pot;
+        gain += pot;
         continue;
       }
       let contributed = 0;
@@ -549,13 +610,22 @@ export function decide(req: DecisionRequest): Decision {
       }
       const sh = share(sim, k, callers);
       if (raisedFlag[k]) {
-        total += continueVsRaise ? sh * potIfReraised - (reraiseTo - myCommit) : -add;
+        if (continueVsRaise) {
+          const invested = reraiseTo - myCommit;
+          gain += sh * (potIfReraised - invested);
+          loss += invested * (1 - sh);
+        } else loss += add;
       } else {
         const r = allCallersAllIn ? 1 : rCalled;
-        total += r * sh * (pot + add + contributed) - add + (allCallersAllIn ? 0 : impliedCalled);
+        gain += r * sh * (pot + contributed);
+        loss += add * (1 - r * sh);
+        const implied = allCallersAllIn ? 0 : impliedCalled;
+        if (implied >= 0) gain += implied;
+        else loss -= implied;
       }
     }
-    return total / n;
+    const bf = bubble(self, mainOpponent, mine.totalCommit + add);
+    return (gain - bf * loss) / n;
   }
 
   // ---- Personality & state adjustments ---------------------------------------------------

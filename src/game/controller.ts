@@ -2,7 +2,7 @@ import { Deck } from '../engine/deck.ts';
 import { categoryOf, HandCategory } from '../engine/evaluator.ts';
 import { TableGame, type HandSettlement } from '../engine/game.ts';
 import { IllegalActionError } from '../engine/hand.ts';
-import { publicRecordFromView } from '../engine/records.ts';
+import { type PublicHandRecord, publicRecordFromView } from '../engine/records.ts';
 import { CryptoRng, type Rng, SeededRng } from '../engine/rng.ts';
 import type { BlindConfig, HandEvent, HandView, LegalActions, PlayerAction } from '../engine/types.ts';
 import { eventsVisibleTo } from '../engine/types.ts';
@@ -11,6 +11,7 @@ import { sanitizeDecision } from '../ai/host.ts';
 import { safeFallbackAction } from '../ai/decide.ts';
 import { observeHand } from '../ai/model.ts';
 import type { StyleId } from '../ai/profiles.ts';
+import { type GameMode, payoutsFor, prizeTable } from './config.ts';
 import { buildHistoryRecord, type HandHistoryRecord } from './history.ts';
 import { type SessionData, nextSeed } from './session.ts';
 import { recordHand } from './stats.ts';
@@ -40,6 +41,23 @@ export interface TableSnapshot {
   seeded: boolean;
   gameOver: boolean;
   humanFinish: { place: number; handNumber: number } | null;
+  mode: GameMode;
+  /** Daily challenge date, if this is one. */
+  daily: string | null;
+  /** Tournament prize points for 1st, 2nd, … (empty in cash games). */
+  prizes: number[];
+  /** Cash games: the buy-in and how many times the human has bought in. */
+  cash: { buyIn: number; humanBuyIns: number; leaving: boolean } | null;
+}
+
+/** Result of a cash-game session, reported when the human cashes out. */
+export interface CashSummary {
+  hands: number;
+  buyIn: number;
+  buyIns: number;
+  finalStack: number;
+  net: number;
+  bigBlind: number;
 }
 
 export interface HandSummary {
@@ -54,6 +72,9 @@ export interface GameOverInfo {
   humanPlace: number;
   fieldSize: number;
   hands: number;
+  /** Prize points by place (index 0 = 1st). */
+  prizes: number[];
+  humanPrize: number;
 }
 
 export type EliminationChoice = 'watch' | 'skip' | 'menu';
@@ -74,15 +95,25 @@ export interface Presenter {
   gameOver(info: GameOverInfo, snapshot: TableSnapshot): void;
   actionRejected(message: string): void;
   notify(message: string, tone: 'info' | 'warning' | 'error'): void;
+  /** Cash games: a player bought chips again. */
+  rebuy?(seat: number, amount: number, snapshot: TableSnapshot): void;
+  /** Cash games: the human has no chips left. */
+  humanBusted?(buyIn: number, snapshot: TableSnapshot): Promise<'rebuy' | 'leave'>;
+  /** Cash games: the session is over. */
+  cashSessionOver?(summary: CashSummary, snapshot: TableSnapshot): void;
 }
 
 export interface ControllerHooks {
   /** Persist the session (called after every change). */
   saveSession?(session: SessionData): void;
-  /** Persist a finished hand. */
-  handRecorded?(record: HandHistoryRecord): void;
-  /** Human's final place in this game. */
-  humanFinished?(place: number, fieldSize: number): void;
+  /** Persist a finished hand (with who was knocked out in it). */
+  handRecorded?(record: HandHistoryRecord, settlement: HandSettlement): void;
+  /** Everything any observer saw in a finished hand (what opponents learn from). */
+  publicHandObserved?(record: PublicHandRecord): void;
+  /** Human's final place in this tournament and the prize points it paid. */
+  humanFinished?(place: number, fieldSize: number, prize: number): void;
+  /** Cash games: the human left the table. */
+  cashedOut?(summary: CashSummary): void;
   /** Milliseconds an AI should appear to think, given how close its decision was (0..1). */
   thinkTime?(closeness: number): number;
   /** Diagnostics for developers (console in the browser). */
@@ -197,10 +228,40 @@ export class GameController {
       handsUntilNextLevel: t.handsUntilNextLevel(),
       nextBlinds: levelIdx + 1 < levels.length && t.config.handsPerLevel !== null ? { ...levels[levelIdx + 1]! } : null,
       button: hand ? t.button : t.isOver ? t.button : t.nextButton(),
-      seeded: this.#session.deckRng !== null,
+      seeded: this.#session.deckRng !== null && !this.#session.setup.daily,
       gameOver: t.isOver,
       humanFinish: this.#session.humanFinish,
+      mode: this.#session.setup.mode,
+      daily: this.#session.setup.daily ?? null,
+      prizes: prizeTable(this.#session.setup),
+      cash: this.#session.cash
+        ? {
+            buyIn: this.#session.cash.buyIn,
+            humanBuyIns: this.#session.cash.buyIns[this.#session.seats[this.#session.humanSeat]!.id] ?? 1,
+            leaving: !!this.#session.cash.leaving,
+          }
+        : null,
     };
+  }
+
+  /** True once there is nothing left to play (tournament over, or cash game cashed out). */
+  get finished(): boolean {
+    return !!this.#session.cash?.cashedOut || this.#table.isOver;
+  }
+
+  /**
+   * Cash games: leave the table. Between hands this happens at once; during a hand the human
+   * finishes it first (chips in the pot cannot be taken off the table).
+   */
+  requestCashOut(): 'now' | 'after-hand' | 'not-cash' {
+    const cash = this.#session.cash;
+    if (!cash || cash.cashedOut) return 'not-cash';
+    cash.leaving = true;
+    this.#save();
+    if (this.#table.handInProgress || this.#table.awaitingSettlement) return 'after-hand';
+    if (this.#running) this.resume();
+    else this.#cashOut();
+    return 'now';
   }
 
   #syncSession(): void {
@@ -258,7 +319,15 @@ export class GameController {
           break;
         }
         if (!this.#table.handInProgress) {
-          await this.#gate();
+          if (this.#table.isCash && this.#session.cash?.cashedOut) break;
+          if (!this.#session.cash?.leaving) await this.#gate();
+          if (this.#table.isCash) {
+            if (this.#session.cash?.leaving) {
+              this.#cashOut();
+              break;
+            }
+            if (!(await this.#settleBuyIns())) break;
+          }
           this.#startHand();
           continue;
         }
@@ -340,6 +409,7 @@ export class GameController {
     let action: PlayerAction;
     let closeness = 0.3;
     try {
+      const payouts = payoutsFor(this.#session.setup);
       const decision = await this.#ai.decide({
         view,
         style: info.style!,
@@ -347,6 +417,7 @@ export class GameController {
         stats,
         tilt: this.#session.ai[info.id]!.tilt,
         seed: nextSeed(rng),
+        ...(payouts && payouts.length > 1 ? { payouts } : {}),
       });
       action = sanitizeDecision(decision.action, legal);
       closeness = decision.difficulty;
@@ -386,7 +457,9 @@ export class GameController {
     const names = Object.fromEntries(this.#session.seats.map((s, i) => [i, s.name]));
     const record = buildHistoryRecord(hand, setup, names, this.#session.humanSeat);
     const publicView = hand.viewFor(null);
-    observeHand(this.#session.statsBook, publicRecordFromView(publicView));
+    const publicRecord = publicRecordFromView(publicView);
+    observeHand(this.#session.statsBook, publicRecord);
+    this.#hooks.publicHandObserved?.(publicRecord);
     recordHand(this.#session.playerStats, record);
     this.#updateTilt(publicView);
 
@@ -402,10 +475,11 @@ export class GameController {
     if (settlement.gameOver && settlement.winnerSeat === this.#session.humanSeat) {
       this.#session.humanFinish = { place: 1, handNumber: settlement.handNumber };
     }
-    this.#hooks.handRecorded?.(record);
+    this.#hooks.handRecorded?.(record, settlement);
     this.#save();
     if (this.#session.humanFinish && (humanOut || settlement.winnerSeat === this.#session.humanSeat)) {
-      this.#hooks.humanFinished?.(this.#session.humanFinish.place, fieldSize);
+      const place = this.#session.humanFinish.place;
+      this.#hooks.humanFinished?.(place, fieldSize, prizeTable(this.#session.setup)[place - 1] ?? 0);
     }
 
     if (!this.#fastForward || settlement.gameOver) {
@@ -448,6 +522,7 @@ export class GameController {
     const winner = this.#table.winner()!;
     const humanPlace =
       this.#session.humanFinish?.place ?? (winner.seat === this.#session.humanSeat ? 1 : (this.#table.players()[this.#session.humanSeat]!.place ?? 0));
+    const prizes = prizeTable(this.#session.setup);
     this.#save();
     this.#presenter.gameOver(
       {
@@ -456,8 +531,57 @@ export class GameController {
         humanPlace,
         fieldSize: this.#session.seats.length,
         hands: this.#table.handNumber,
+        prizes,
+        humanPrize: prizes[humanPlace - 1] ?? 0,
       },
       this.snapshot(),
     );
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // Cash games
+
+  /** Buys chips for everyone who has none. Returns false if the human chose to leave instead. */
+  async #settleBuyIns(): Promise<boolean> {
+    const cash = this.#session.cash!;
+    for (const seat of this.#table.seatsWithoutChips()) {
+      const info = this.#session.seats[seat]!;
+      if (info.kind === 'human') {
+        const choice = (await this.#presenter.humanBusted?.(cash.buyIn, this.snapshot())) ?? 'rebuy';
+        if (this.#stopped) throw new StopSignal();
+        if (choice === 'leave') {
+          this.#cashOut();
+          return false;
+        }
+      }
+      this.#table.addChips(seat, cash.buyIn);
+      cash.buyIns[info.id] = (cash.buyIns[info.id] ?? 1) + 1;
+      this.#checkpoint = this.#table.serialize();
+      if (!this.#verify()) return true;
+      this.#save();
+      if (!this.#fastForward) this.#presenter.rebuy?.(seat, cash.buyIn, this.snapshot());
+    }
+    return true;
+  }
+
+  #cashOut(): void {
+    const cash = this.#session.cash!;
+    if (cash.cashedOut) return;
+    const human = this.#session.seats[this.#session.humanSeat]!;
+    const stack = this.#table.players()[this.#session.humanSeat]!.stack;
+    const buyIns = cash.buyIns[human.id] ?? 1;
+    const summary: CashSummary = {
+      hands: this.#session.playerStats.handsPlayed,
+      buyIn: cash.buyIn,
+      buyIns,
+      finalStack: stack,
+      net: stack - buyIns * cash.buyIn,
+      bigBlind: this.#table.blindsForHand(this.#table.handNumber + 1).bigBlind,
+    };
+    cash.cashedOut = { stack, hands: summary.hands };
+    cash.leaving = false;
+    this.#save();
+    this.#hooks.cashedOut?.(summary);
+    this.#presenter.cashSessionOver?.(summary, this.snapshot());
   }
 }

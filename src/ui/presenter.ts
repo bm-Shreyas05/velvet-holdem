@@ -3,7 +3,7 @@ import { bestFiveCards, describeHand, evaluate } from '../engine/evaluator.ts';
 import { buildPots } from '../engine/pots.ts';
 import type { HandEvent, LegalActions, PlayerAction } from '../engine/types.ts';
 import type { AudioEngine } from '../audio/audio.ts';
-import type { EliminationChoice, GameOverInfo, HandSummary, Presenter, TableSnapshot } from '../game/controller.ts';
+import type { CashSummary, EliminationChoice, GameOverInfo, HandSummary, Presenter, TableSnapshot } from '../game/controller.ts';
 import { SPEEDS, type Settings } from '../game/settings.ts';
 import type { ActionBar } from './action-bar.ts';
 import { type Announcer, choose, toast } from './dialogs.ts';
@@ -25,6 +25,8 @@ export interface PresenterDeps {
   updateHeader: (snapshot: TableSnapshot) => void;
   isPaused: () => boolean;
   onGameOver: (info: GameOverInfo, snapshot: TableSnapshot) => void;
+  /** Cash games: the session has ended. */
+  onCashSessionOver?: (summary: CashSummary, snapshot: TableSnapshot) => void;
   /** Resolves when the player asks for the next hand (or immediately if auto-continue is on). */
   waitForNextHand: (autoMs: number) => Promise<void>;
   debug: boolean;
@@ -354,6 +356,45 @@ export class DomPresenter implements Presenter {
 
   actionRejected(message: string): void {
     toast(message, 'warning');
+  }
+
+  rebuy(seat: number, amount: number, snapshot: TableSnapshot): void {
+    this.#lastSnapshot = snapshot;
+    const who = this.#name(seat);
+    const sentence = `${who} ${who === 'You' ? 'buy' : 'buys'} in again for ${chips(amount)}`;
+    this.#d.log.entry(sentence, 'info');
+    this.#d.announcer.say(`${sentence}.`);
+    if (seat !== this.#humanSeat) toast(sentence, 'info', 2400);
+    this.#d.audio.play('chips', 1);
+    this.#display = displayFromSnapshot(snapshot);
+    this.#render();
+    this.#d.updateHeader(snapshot);
+  }
+
+  async humanBusted(buyIn: number, snapshot: TableSnapshot): Promise<'rebuy' | 'leave'> {
+    this.#lastSnapshot = snapshot;
+    this.#d.bar.idle('You are out of chips');
+    const spent = (snapshot.cash?.humanBuyIns ?? 1) * buyIn;
+    const msg = h(
+      'div',
+      {},
+      h('p', { class: 'result-line' }, 'You are out of chips.'),
+      h(
+        'p',
+        { class: 'sheet-message' },
+        `Buy in again for ${chips(buyIn)} to keep playing, or leave the table. So far you have bought in for ${chips(spent)} in total.`,
+      ),
+    );
+    return choose<'rebuy' | 'leave'>('Buy in again?', msg, [
+      { id: 'leave', label: 'Leave the table' },
+      { id: 'rebuy', label: `Buy in for ${chips(buyIn)}`, primary: true },
+    ]);
+  }
+
+  cashSessionOver(summary: CashSummary, snapshot: TableSnapshot): void {
+    this.#lastSnapshot = snapshot;
+    this.#d.bar.idle('Session over');
+    this.#d.onCashSessionOver?.(summary, snapshot);
   }
 
   notify(message: string, tone: 'info' | 'warning' | 'error'): void {

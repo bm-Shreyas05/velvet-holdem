@@ -3,7 +3,7 @@ import { CryptoRng, type Rng, SeededRng, type SeedState, isSeedState, randomInt 
 import { type StatsBook, isStatsBook } from '../ai/model.ts';
 import { STYLE_ORDER, type StyleId, isStyle } from '../ai/profiles.ts';
 import { SCENARIOS, preparedDeck } from '../dev/scenarios.ts';
-import { type NewGameSetup, gameConfigFor, validateSetup } from './config.ts';
+import { type NewGameSetup, gameConfigFor, normaliseSetup, validateSetup } from './config.ts';
 import { type PlayerStats, emptyStats, isPlayerStats } from './stats.ts';
 
 export interface SeatInfo {
@@ -11,6 +11,17 @@ export interface SeatInfo {
   name: string;
   kind: 'human' | 'ai';
   style: StyleId | null;
+}
+
+/** Cash games: how many times each player has bought in, and the human's cash-out. */
+export interface CashState {
+  buyIn: number;
+  /** Buy-ins per player id, including the first. */
+  buyIns: Record<string, number>;
+  /** Set when the human leaves the table; the session is then over. */
+  cashedOut: { stack: number; hands: number } | null;
+  /** The human asked to cash out; the session ends after the hand in progress. */
+  leaving?: boolean;
 }
 
 export interface AiState {
@@ -41,6 +52,8 @@ export interface SessionData {
   spectate: 'watch' | 'skip' | null;
   /** Developer scenarios only: prepared deck orders by hand number. */
   devDecks?: Record<number, number[]>;
+  /** Cash games only. */
+  cash?: CashState;
 }
 
 export const SESSION_VERSION = 1;
@@ -90,6 +103,8 @@ export function createSession(setup: NewGameSetup): SessionData {
   }
   const ai: Record<string, AiState> = {};
   for (const s of seats) if (s.kind === 'ai') ai[s.id] = { tilt: 0, rng: nextSeed(master) };
+  const cash: CashState | undefined =
+    setup.mode === 'cash' ? { buyIn: setup.startingStack, buyIns: Object.fromEntries(seats.map((s) => [s.id, 1])), cashedOut: null } : undefined;
 
   return {
     version: SESSION_VERSION,
@@ -108,7 +123,14 @@ export function createSession(setup: NewGameSetup): SessionData {
     humanFinish: null,
     spectate: null,
     ...(devDecks ? { devDecks } : {}),
+    ...(cash ? { cash } : {}),
   };
+}
+
+/** Fills fields added in later versions (saves from older versions keep loading). */
+export function normaliseSession(s: SessionData): SessionData {
+  s.setup = normaliseSetup(s.setup);
+  return s;
 }
 
 /** Structural validation of a loaded session; deep poker invariants are checked on restore. */
@@ -123,6 +145,11 @@ export function validateSession(value: unknown): string | null {
   }
   if (!Number.isInteger(s.humanSeat) || s.seats[s.humanSeat]?.kind !== 'human') return 'missing human player';
   if (!s.table || !s.setup) return 'missing table state';
+  if (s.setup.mode === 'cash') {
+    const c = s.cash;
+    if (!c || !Number.isInteger(c.buyIn) || c.buyIn <= 0 || !c.buyIns || typeof c.buyIns !== 'object') return 'damaged cash-game state';
+    if (s.seats.some((seat) => !Number.isInteger(c.buyIns[seat.id]) || c.buyIns[seat.id]! < 1)) return 'damaged cash-game state';
+  }
   if (!isStatsBook(s.statsBook)) return 'damaged opponent notes';
   if (!isPlayerStats(s.playerStats)) return 'damaged statistics';
   for (const seat of s.seats) {

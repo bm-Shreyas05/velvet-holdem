@@ -1,8 +1,9 @@
 import type { HandHistoryRecord } from './history.ts';
 import { isHistoryRecord } from './history.ts';
 import { type KeyValueStore, MemoryStore, SlotStore, browserStore } from './persistence.ts';
-import { type SessionData, SESSION_VERSION, validateSession } from './session.ts';
+import { type SessionData, SESSION_VERSION, normaliseSession, validateSession } from './session.ts';
 import { type Settings, normaliseSettings } from './settings.ts';
+import { emptyProgress, normaliseProgress, type ProgressData, validateProgress } from './progress.ts';
 import { type CareerStats, emptyCareer, isPlayerStats } from './stats.ts';
 
 export interface HistoryFile {
@@ -23,6 +24,7 @@ export class GameStorage {
   readonly session: SlotStore<SessionData>;
   readonly history: SlotStore<HistoryFile>;
   readonly career: SlotStore<CareerStats>;
+  readonly progress: SlotStore<ProgressData>;
   #warned = false;
   onWriteFailure: ((reason: string) => void) | null = null;
 
@@ -35,7 +37,12 @@ export class GameStorage {
       validate: (p) => (p && typeof p === 'object' ? null : 'not a settings object'),
       normalise: (p) => normaliseSettings(p),
     });
-    this.session = new SlotStore<SessionData>(kv, 'velvet.session', { kind: 'session', version: SESSION_VERSION, validate: validateSession });
+    this.session = new SlotStore<SessionData>(kv, 'velvet.session', {
+      kind: 'session',
+      version: SESSION_VERSION,
+      validate: validateSession,
+      normalise: normaliseSession,
+    });
     this.history = new SlotStore<HistoryFile>(kv, 'velvet.history', {
       kind: 'history',
       version: 1,
@@ -49,6 +56,12 @@ export class GameStorage {
       version: 1,
       validate: (p) => (isPlayerStats(p) && typeof (p as CareerStats).gamesPlayed === 'number' ? null : 'damaged statistics'),
       normalise: (p) => ({ ...emptyCareer(), ...p }),
+    });
+    this.progress = new SlotStore<ProgressData>(kv, 'velvet.progress', {
+      kind: 'progress',
+      version: 1,
+      validate: validateProgress,
+      normalise: normaliseProgress,
     });
   }
 
@@ -71,6 +84,11 @@ export class GameStorage {
   loadCareer(): CareerStats {
     const r = this.career.load();
     return r.status === 'ok' ? r.payload : emptyCareer();
+  }
+
+  loadProgress(): ProgressData {
+    const r = this.progress.load();
+    return r.status === 'ok' ? r.payload : emptyProgress();
   }
 
   loadHistory(gameId: string): HandHistoryRecord[] {

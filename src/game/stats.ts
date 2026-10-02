@@ -42,6 +42,15 @@ export interface CareerStats extends PlayerStats {
   /** Count of finishes by place, e.g. {"1": 3, "2": 5}. */
   finishes: Record<string, number>;
   bestFinishOf: Record<string, number>;
+  /** Tournament prize points won (every entry costs BUY_IN_POINTS). */
+  prizePoints: number;
+  /** Finishes that paid a prize. */
+  cashes: number;
+  /** Cash games: sessions, hands, and the net result in chips and in big blinds. */
+  cashSessions: number;
+  cashHands: number;
+  cashNet: number;
+  cashNetBB: number;
 }
 
 export function emptyStats(): PlayerStats {
@@ -69,7 +78,19 @@ export function emptyStats(): PlayerStats {
 }
 
 export function emptyCareer(): CareerStats {
-  return { ...emptyStats(), gamesPlayed: 0, gamesWon: 0, finishes: {}, bestFinishOf: {} };
+  return {
+    ...emptyStats(),
+    gamesPlayed: 0,
+    gamesWon: 0,
+    finishes: {},
+    bestFinishOf: {},
+    prizePoints: 0,
+    cashes: 0,
+    cashSessions: 0,
+    cashHands: 0,
+    cashNet: 0,
+    cashNetBB: 0,
+  };
 }
 
 /** Adds one hand to the stats of the player in `record.humanSeat`. */
@@ -143,13 +164,22 @@ export function recordHand(stats: PlayerStats, record: HandHistoryRecord): void 
   }
 }
 
-export function recordFinish(career: CareerStats, place: number, fieldSize: number): void {
+export function recordFinish(career: CareerStats, place: number, fieldSize: number, prize = 0): void {
   career.gamesPlayed++;
+  career.prizePoints += prize;
+  if (prize > 0) career.cashes++;
   if (place === 1) career.gamesWon++;
   career.finishes[String(place)] = (career.finishes[String(place)] ?? 0) + 1;
   const key = String(fieldSize);
   const best = career.bestFinishOf[key];
   if (best === undefined || place < best) career.bestFinishOf[key] = place;
+}
+
+export function recordCashSession(career: CareerStats, s: { hands: number; net: number; bigBlind: number }): void {
+  career.cashSessions++;
+  career.cashHands += s.hands;
+  career.cashNet += s.net;
+  career.cashNetBB += s.net / Math.max(1, s.bigBlind);
 }
 
 export function mergeInto(target: PlayerStats, source: PlayerStats): void {

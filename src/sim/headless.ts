@@ -1,6 +1,6 @@
 import type { LegalActions, PlayerAction } from '../engine/types.ts';
 import type { Rng } from '../engine/rng.ts';
-import type { EliminationChoice, GameOverInfo, HandSummary, Presenter, TableSnapshot } from '../game/controller.ts';
+import type { CashSummary, EliminationChoice, GameOverInfo, HandSummary, Presenter, TableSnapshot } from '../game/controller.ts';
 import type { HandEvent } from '../engine/types.ts';
 import { randomLegalAction } from './bots.ts';
 
@@ -16,6 +16,10 @@ export class HeadlessPresenter implements Presenter {
   readonly rejections: string[] = [];
   gameOverInfo: GameOverInfo | null = null;
   eliminationChoice: EliminationChoice = 'skip';
+  /** Cash games: what the human does when out of chips. */
+  bustChoice: 'rebuy' | 'leave' = 'rebuy';
+  readonly rebuys: { seat: number; amount: number }[] = [];
+  cashSummary: CashSummary | null = null;
   violations: string[] = [];
   #decide: (legal: LegalActions, snapshot: TableSnapshot) => PlayerAction;
 
@@ -64,5 +68,14 @@ export class HeadlessPresenter implements Presenter {
   }
   notify(message: string, tone: 'info' | 'warning' | 'error'): void {
     this.notices.push({ message, tone });
+  }
+  rebuy(seat: number, amount: number): void {
+    this.rebuys.push({ seat, amount });
+  }
+  async humanBusted(): Promise<'rebuy' | 'leave'> {
+    return this.bustChoice;
+  }
+  cashSessionOver(summary: CashSummary): void {
+    this.cashSummary = summary;
   }
 }

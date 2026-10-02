@@ -384,9 +384,14 @@ kbd {
   display: none;
 }
 
-/* Install spans the full row so the 2-column grid stays balanced. */
-.menu-secondary > .menu-link:nth-child(5) {
+/* An odd last link spans the row so the two-column grid stays balanced (set in screens.ts). */
+.menu-link--wide {
   grid-column: 1 / -1;
+}
+
+.menu-btn--daily {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface));
 }
 
 .menu-link:hover {
@@ -579,6 +584,31 @@ kbd {
   color: var(--accent-ink);
 }
 
+.seg--locked {
+  opacity: 0.55;
+  cursor: help;
+}
+
+.segmented--wide {
+  display: flex;
+  width: 100%;
+}
+
+.segmented--wide .seg {
+  flex: 1;
+  min-height: 40px;
+}
+
+.choice[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.setup-sub {
+  margin: 14px 0 6px;
+  font-size: 0.95em;
+}
+
 .choice-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -692,6 +722,20 @@ kbd {
   background: color-mix(in srgb, var(--warn) 25%, var(--surface));
 }
 
+.info-daily {
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
+}
+
+.info-pos {
+  color: var(--pos);
+  font-weight: 700;
+}
+
+.info-neg {
+  color: var(--neg);
+  font-weight: 700;
+}
+
 .top-actions {
   display: flex;
   gap: 2px;
@@ -743,6 +787,25 @@ kbd {
   --felt-1: #7c2c3b;
   --felt-2: #45131f;
   --felt-3: #2c0b13;
+}
+
+/* Unlocked by achievements. */
+.stage[data-felt="teal"] {
+  --felt-1: #1f6f74;
+  --felt-2: #0e3d42;
+  --felt-3: #08282c;
+}
+
+.stage[data-felt="royal"] {
+  --felt-1: #5b3487;
+  --felt-2: #2e1650;
+  --felt-3: #1d0d35;
+}
+
+.stage[data-felt="midnight"] {
+  --felt-1: #2a3140;
+  --felt-2: #141922;
+  --felt-3: #0b0e14;
 }
 
 /* The table: a padded leather rail around lit felt. */
@@ -2374,4 +2437,95 @@ input[type="checkbox"][role="switch"]:checked::after {
 
 .action-bar.is-between .next-hand {
   min-width: min(320px, 100%);
+}
+
+/* ---- Achievements, summaries, daily ------------------------------------------------------- */
+
+.achievements {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 8px;
+}
+
+.achievement {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: start;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.achievement.is-earned {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
+  background: var(--accent-soft);
+}
+
+.achievement.is-locked {
+  opacity: 0.72;
+}
+
+.ach-mark {
+  font-size: 1.3em;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.ach-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ach-desc,
+.ach-date {
+  font-size: 0.85em;
+  color: var(--ink-2);
+}
+
+.ach-reward {
+  font-size: 0.8em;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.summary-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 18px;
+  margin: 8px 0 4px;
+}
+
+.summary-list dt {
+  color: var(--ink-2);
+}
+
+.summary-list dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.daily-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 4px 0 10px;
+}
+
+.daily-note .sheet-message {
+  margin: 0;
+}
+
+.prize-line .muted {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.9em;
 }

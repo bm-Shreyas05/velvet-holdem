@@ -170,6 +170,8 @@ export function cardFaceSvg(card: Card, style: CardStyle): string {
 export const CARD_BACKS = {
   claret: { base: '#6e1d2b', dark: '#4d1420', line: '#d4b06a' },
   midnight: { base: '#1d2c4d', dark: '#121c33', line: '#c9b27a' },
+  emerald: { base: '#145c43', dark: '#0b3a2a', line: '#d9c27e' },
+  onyx: { base: '#1c1b1f', dark: '#0e0d10', line: '#e1b85c' },
 } as const;
 
 export function cardBackSvg(back: keyof typeof CARD_BACKS): string {

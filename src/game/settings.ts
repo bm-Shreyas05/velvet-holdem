@@ -2,8 +2,24 @@
 export type Speed = 'relaxed' | 'normal' | 'fast' | 'turbo';
 export type MotionPreference = 'system' | 'reduced' | 'full';
 export type ThemePreference = 'system' | 'dark' | 'light';
-export type Felt = 'emerald' | 'navy' | 'claret';
-export type CardBack = 'claret' | 'midnight';
+export type Felt = 'emerald' | 'navy' | 'claret' | 'royal' | 'midnight' | 'teal';
+export type CardBack = 'claret' | 'midnight' | 'emerald' | 'onyx';
+
+export const FELTS: { value: Felt; label: string }[] = [
+  { value: 'emerald', label: 'Emerald' },
+  { value: 'navy', label: 'Navy' },
+  { value: 'claret', label: 'Claret' },
+  { value: 'teal', label: 'Teal' },
+  { value: 'royal', label: 'Royal' },
+  { value: 'midnight', label: 'Midnight' },
+];
+
+export const CARD_BACK_CHOICES: { value: CardBack; label: string }[] = [
+  { value: 'claret', label: 'Claret' },
+  { value: 'midnight', label: 'Midnight' },
+  { value: 'emerald', label: 'Emerald' },
+  { value: 'onyx', label: 'Onyx' },
+];
 
 export interface Settings {
   version: 1;
@@ -30,6 +46,10 @@ export interface Settings {
     alwaysShowCards: boolean;
     confirmAllIn: boolean;
     autoContinue: boolean;
+    /** Opponents start each game with what they learned about you in earlier ones. */
+    opponentsRemember: boolean;
+    /** Show the coach's suggestion on your turn. */
+    coachHints: boolean;
   };
   accessibility: {
     motion: MotionPreference;
@@ -44,7 +64,16 @@ export function defaultSettings(): Settings {
     version: 1,
     audio: { muted: false, master: 0.8, effects: 0.8, interface: 0.5, ambience: 0.25 },
     display: { theme: 'system', uiScale: 1, felt: 'emerald', cardBack: 'claret', fourColorDeck: false, highContrast: false },
-    gameplay: { speed: 'normal', showHandStrength: true, showPotOdds: true, alwaysShowCards: false, confirmAllIn: false, autoContinue: true },
+    gameplay: {
+      speed: 'normal',
+      showHandStrength: true,
+      showPotOdds: true,
+      alwaysShowCards: false,
+      confirmAllIn: false,
+      autoContinue: true,
+      opponentsRemember: true,
+      coachHints: false,
+    },
     accessibility: { motion: 'system', announceActions: true },
   };
 }
@@ -73,8 +102,18 @@ export function normaliseSettings(raw: unknown): Settings {
     display: {
       theme: oneOf(disp.theme, ['system', 'dark', 'light'] as const) ? disp.theme : d.display.theme,
       uiScale: (UI_SCALES as readonly number[]).includes(disp.uiScale as number) ? disp.uiScale! : d.display.uiScale,
-      felt: oneOf(disp.felt, ['emerald', 'navy', 'claret'] as const) ? disp.felt : d.display.felt,
-      cardBack: oneOf(disp.cardBack, ['claret', 'midnight'] as const) ? disp.cardBack : d.display.cardBack,
+      felt: oneOf(
+        disp.felt,
+        FELTS.map((f) => f.value),
+      )
+        ? disp.felt
+        : d.display.felt,
+      cardBack: oneOf(
+        disp.cardBack,
+        CARD_BACK_CHOICES.map((c) => c.value),
+      )
+        ? disp.cardBack
+        : d.display.cardBack,
       fourColorDeck: bool(disp.fourColorDeck, d.display.fourColorDeck),
       highContrast: bool(disp.highContrast, d.display.highContrast),
     },
@@ -85,6 +124,8 @@ export function normaliseSettings(raw: unknown): Settings {
       alwaysShowCards: bool(g.alwaysShowCards, d.gameplay.alwaysShowCards),
       confirmAllIn: bool(g.confirmAllIn, d.gameplay.confirmAllIn),
       autoContinue: bool(g.autoContinue, d.gameplay.autoContinue),
+      opponentsRemember: bool(g.opponentsRemember, d.gameplay.opponentsRemember),
+      coachHints: bool(g.coachHints, d.gameplay.coachHints),
     },
     accessibility: {
       motion: oneOf(acc.motion, ['system', 'reduced', 'full'] as const) ? acc.motion : d.accessibility.motion,

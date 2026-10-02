@@ -13,6 +13,11 @@ export interface GameConfig {
   levels: BlindConfig[];
   /** Hands per blind level, or null for fixed blinds. */
   handsPerLevel: number | null;
+  /**
+   * 'freezeout' (default): busted players are out and the last one standing wins.
+   * 'cash': nobody is eliminated; a player without chips must buy in again before the next hand.
+   */
+  format?: 'freezeout' | 'cash';
 }
 
 export interface GamePlayerState {
@@ -78,14 +83,16 @@ export function validateGameConfig(config: GameConfig): string | null {
     if (!Number.isInteger(l.ante) || l.ante < 0) return 'Ante must be zero or a positive whole number.';
   }
   if (config.handsPerLevel !== null && !isPosInt(config.handsPerLevel)) return 'Hands per level must be a positive number.';
+  if (config.format !== undefined && config.format !== 'freezeout' && config.format !== 'cash') return 'Unknown game format.';
   if (config.levels[0]!.bigBlind > config.startingStack) return 'The starting stack must cover the big blind.';
   return null;
 }
 
 /**
- * A freeze-out at one table: players keep playing hands until one holds every chip. Handles the
- * button, blind levels, eliminations and finishing places. Poker rules for each hand live in
- * HoldemHand; this class only sequences hands.
+ * One table of hands: a freeze-out (players keep playing until one holds every chip) or a cash
+ * game (players buy in again when they run out). Handles the button, blind levels, eliminations,
+ * finishing places and buy-ins. Poker rules for each hand live in HoldemHand; this class only
+ * sequences hands.
  */
 export class TableGame {
   #s: GameStateData;
@@ -143,6 +150,10 @@ export class TableGame {
     return this.#s.totalChips;
   }
 
+  get isCash(): boolean {
+    return this.#s.config.format === 'cash';
+  }
+
   /** The hand being played (or just finished). Only the controller holds this reference. */
   get hand(): HoldemHand | null {
     return this.#hand;
@@ -169,7 +180,28 @@ export class TableGame {
   }
 
   get isOver(): boolean {
+    if (this.isCash) return false;
     return this.#s.players.filter((p) => !p.eliminated).length <= 1;
+  }
+
+  /** Cash games: seats that need to buy in before the next hand can start. */
+  seatsWithoutChips(): number[] {
+    if (this.#hand && !this.#s.handSettled) return [];
+    return this.#s.players.filter((p) => !p.eliminated && p.stack === 0).map((p) => p.seat);
+  }
+
+  /**
+   * Cash games only: a player buys more chips between hands. The chips enter the game, so the
+   * table's chip total grows by the same amount.
+   */
+  addChips(seat: number, amount: number): void {
+    if (!this.isCash) throw new Error('Buying in again is only possible in a cash game');
+    if (!this.#s.handSettled) throw new Error('Chips can only be added between hands');
+    if (!isPosInt(amount)) throw new Error('A buy-in must be a positive whole number of chips');
+    const p = this.#s.players[seat];
+    if (!p || p.eliminated) throw new Error('No such player at the table');
+    p.stack += amount;
+    this.#s.totalChips += amount;
   }
 
   winner(): GamePlayerState | null {
@@ -219,6 +251,7 @@ export class TableGame {
   startHand(deck: Deck, options: { alwaysShow?: number[] } = {}): HandEvent[] {
     if (this.isOver) throw new Error('The game is over');
     if (!this.#s.handSettled) throw new Error('The previous hand has not been settled');
+    if (this.seatsWithoutChips().length) throw new Error('Every player needs chips before the next hand');
     const handNumber = this.#s.handNumber + 1;
     const button = this.nextButton();
     const setup: HandSetup = {
@@ -248,6 +281,11 @@ export class TableGame {
     if (!hand?.isComplete) throw new Error('No completed hand to settle');
     if (this.#s.handSettled) throw new Error('Hand already settled');
     const result = hand.result!;
+    if (this.isCash) {
+      for (const p of this.#s.players) if (!p.eliminated) p.stack = result.finalStacks[p.seat]!;
+      this.#s.handSettled = true;
+      return { handNumber: this.#s.handNumber, eliminations: [], gameOver: false, winnerSeat: null };
+    }
     const aliveBefore = this.#s.players.filter((p) => !p.eliminated).length;
     const busted: { player: GamePlayerState; startStack: number }[] = [];
     for (const p of this.#s.players) {
@@ -287,7 +325,8 @@ export class TableGame {
     for (const p of s.players) {
       if (!Number.isInteger(p.stack) || p.stack < 0) problems.push(`${p.name}: invalid stack ${p.stack}`);
       if (p.eliminated && p.stack !== 0 && s.handSettled) problems.push(`${p.name}: eliminated with chips`);
-      if (!p.eliminated && p.stack === 0 && s.handSettled) problems.push(`${p.name}: no chips but not eliminated`);
+      // In a cash game a player may sit with no chips between hands until they buy in again.
+      if (!p.eliminated && p.stack === 0 && s.handSettled && !this.isCash) problems.push(`${p.name}: no chips but not eliminated`);
     }
     if (this.#hand && !s.handSettled) {
       problems.push(...this.#hand.checkInvariants().map((m) => `hand: ${m}`));

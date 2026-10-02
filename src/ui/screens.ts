@@ -4,11 +4,27 @@ import { cardFaceUrl } from '../assets/cards.ts';
 import { ICONS } from '../assets/icons.ts';
 import { DEFAULT_PERSONAS, DIFFICULTIES, DIFFICULTY_ORDER, STYLES, STYLE_ORDER, type StyleId } from '../ai/profiles.ts';
 import { SCENARIOS } from '../dev/scenarios.ts';
-import { MAX_OPPONENTS, MIN_OPPONENTS, type NewGameSetup, STRUCTURES, type Structure, defaultSetup, validateSetup } from '../game/config.ts';
+import {
+  dailySetup,
+  defaultCashSetup,
+  defaultSetup,
+  type GameMode,
+  MAX_OPPONENTS,
+  MIN_OPPONENTS,
+  type NewGameSetup,
+  PAYOUTS,
+  type PayoutId,
+  STRUCTURES,
+  type Structure,
+  todayKey,
+  validateSetup,
+} from '../game/config.ts';
+import { dailyStreak } from '../game/progress.ts';
 import type { App } from './app.ts';
 import { confirm, toast } from './dialogs.ts';
 import { canInstall, onInstallAvailabilityChange, promptInstall } from './pwa.ts';
 import { h } from './dom.ts';
+import { ordinal } from './format.ts';
 
 /** Main menu: continue, new game, and the secondary screens. */
 export function renderMenu(app: App): HTMLElement {
@@ -40,6 +56,27 @@ export function renderMenu(app: App): HTMLElement {
   fresh.addEventListener('click', () => app.showSetup());
   primary.push(fresh);
 
+  // Today's daily challenge: the same table and deals for everyone.
+  const today = todayKey();
+  const progress = app.storage.loadProgress();
+  const done = progress.daily[today];
+  const streak = dailyStreak(progress, today);
+  const todays = dailySetup(today, 'You');
+  const daily = h(
+    'button',
+    { type: 'button', class: 'menu-btn menu-btn--daily' },
+    h('span', { class: 'menu-btn-label' }, 'Daily challenge'),
+    h(
+      'span',
+      { class: 'menu-btn-sub' },
+      done
+        ? `Today: ${ordinal(done.place)} of ${done.fieldSize}${streak > 1 ? ` · ${streak}-day streak` : ''} · replay for practice`
+        : `${todays.opponents.length + 1} players · ${DIFFICULTIES[todays.difficulty].label} · same deals for everyone${streak ? ` · streak ${streak}` : ''}`,
+    ),
+  );
+  daily.addEventListener('click', () => void app.startDaily());
+  primary.push(daily);
+
   const notice =
     saved && !saved.ok
       ? h(
@@ -66,6 +103,7 @@ export function renderMenu(app: App): HTMLElement {
       [
         ['Statistics', ICONS.stats, () => app.openStats()],
         ['Hand history', ICONS.history, () => app.openHistory()],
+        ['Achievements', ICONS.trophy, () => app.openAchievements()],
         ['How to play', ICONS.help, () => app.openHelp()],
         ['Settings', ICONS.settings, () => app.openSettings()],
       ] as const
@@ -78,10 +116,18 @@ export function renderMenu(app: App): HTMLElement {
   // Offered only when the browser supports installing and the game is not installed yet.
   const install = h('button', { type: 'button', class: 'menu-link', html: `${ICONS.install}<span>Install app</span>` });
   install.addEventListener('click', () => void promptInstall());
-  install.hidden = !canInstall();
   secondary.append(install);
+  // In the two-column grid, an odd last link spans the row.
+  const layoutLinks = () => {
+    install.hidden = !canInstall();
+    const visible = [...secondary.children].filter((el) => !(el as HTMLElement).hidden);
+    visible.forEach((el, i) => {
+      el.classList.toggle('menu-link--wide', i === visible.length - 1 && visible.length % 2 === 1);
+    });
+  };
+  layoutLinks();
   const stopWatching = onInstallAvailabilityChange(() => {
-    if (secondary.isConnected) install.hidden = !canInstall();
+    if (secondary.isConnected) layoutLinks();
     else stopWatching();
   });
 
@@ -140,8 +186,11 @@ export function renderSetup(app: App, previous: NewGameSetup | null): HTMLElemen
             setup.opponents.push({ name: next.name, style: next.style });
           }
           setup.opponents.length = n;
+          // Fall back to a prize structure the new table size allows.
+          if (n + 1 < PAYOUTS[setup.payout].minPlayers) setup.payout = n + 1 >= PAYOUTS.top2.minPlayers ? 'top2' : 'winner';
           renderCount();
           renderOpponents();
+          renderChips();
         });
         return b;
       }),
@@ -208,31 +257,33 @@ export function renderSetup(app: App, previous: NewGameSetup | null): HTMLElemen
     input.addEventListener('input', () => set(Math.round(Number(input.value))));
     return h('label', { class: 'field', for: id }, h('span', { class: 'field-label' }, label), input, h('span', { class: 'field-hint' }, hint));
   };
-  const chipsRow = h(
-    'div',
-    { class: 'field-row' },
-    numberField(
-      'setup-stack',
-      'Starting chips',
-      () => setup.startingStack,
-      (v) => (setup.startingStack = v),
-      'Each player starts with this many.',
-    ),
-    numberField(
-      'setup-sb',
-      'Small blind',
-      () => setup.smallBlind,
-      (v) => (setup.smallBlind = v),
-      'Posted left of the button.',
-    ),
-    numberField(
-      'setup-bb',
-      'Big blind',
-      () => setup.bigBlind,
-      (v) => (setup.bigBlind = v),
-      'Also the minimum bet.',
-    ),
-  );
+  const cash = () => setup.mode === 'cash';
+  const chipsRow = () =>
+    h(
+      'div',
+      { class: 'field-row' },
+      numberField(
+        'setup-stack',
+        cash() ? 'Buy-in' : 'Starting chips',
+        () => setup.startingStack,
+        (v) => (setup.startingStack = v),
+        cash() ? 'Chips you sit down with, and each time you buy in again.' : 'Each player starts with this many.',
+      ),
+      numberField(
+        'setup-sb',
+        'Small blind',
+        () => setup.smallBlind,
+        (v) => (setup.smallBlind = v),
+        'Posted left of the button.',
+      ),
+      numberField(
+        'setup-bb',
+        'Big blind',
+        () => setup.bigBlind,
+        (v) => (setup.bigBlind = v),
+        'Also the minimum bet.',
+      ),
+    );
 
   const structGroup = h('div', { class: 'choice-grid choice-grid--compact', role: 'radiogroup', 'aria-label': 'Blind structure' });
   const renderStruct = () =>
@@ -253,6 +304,88 @@ export function renderSetup(app: App, previous: NewGameSetup | null): HTMLElemen
       }),
     );
   renderStruct();
+
+  const payoutGroup = h('div', { class: 'choice-grid choice-grid--compact', role: 'radiogroup', 'aria-label': 'Prizes' });
+  const renderPayout = () =>
+    payoutGroup.replaceChildren(
+      ...(Object.keys(PAYOUTS) as PayoutId[]).map((k) => {
+        const info = PAYOUTS[k];
+        const players = setup.opponents.length + 1;
+        const tooFew = players < info.minPlayers;
+        const b = h(
+          'button',
+          { type: 'button', role: 'radio', 'aria-checked': String(setup.payout === k), 'aria-disabled': tooFew ? 'true' : undefined, class: 'choice' },
+          h('span', { class: 'choice-title' }, info.label),
+          h('span', { class: 'choice-sub' }, tooFew ? `Needs at least ${info.minPlayers} players.` : info.blurb),
+        ) as HTMLButtonElement;
+        b.addEventListener('click', () => {
+          if (tooFew) {
+            toast(`"${info.label}" needs at least ${info.minPlayers} players.`, 'info');
+            return;
+          }
+          setup.payout = k;
+          renderPayout();
+        });
+        return b;
+      }),
+    );
+
+  const antes = h('input', { type: 'checkbox', id: 'setup-antes', role: 'switch' }) as HTMLInputElement;
+  antes.checked = setup.antes;
+  antes.addEventListener('change', () => (setup.antes = antes.checked));
+  const antesField = h(
+    'label',
+    { class: 'setting setting--toggle', for: 'setup-antes' },
+    h(
+      'span',
+      { class: 'setting-text' },
+      h('span', { class: 'setting-label' }, 'Antes'),
+      h('span', { class: 'setting-hint' }, 'From level 4, everyone also posts a tenth of the big blind.'),
+    ),
+    antes,
+  );
+
+  const chipsSection = h('section', { class: 'setup-section' });
+  const headline = h('p', {});
+  const renderChips = () => {
+    renderPayout();
+    headline.textContent = cash()
+      ? 'A cash game: fixed blinds, buy in again whenever you run out, cash out when you like.'
+      : 'A tournament: play until one player holds every chip.';
+    chipsSection.replaceChildren(
+      h('h2', {}, cash() ? 'Stakes' : 'Chips and blinds'),
+      chipsRow(),
+      ...(cash()
+        ? [h('p', { class: 'field-hint' }, 'Blinds stay the same all session. Results count in chips and big blinds won or lost.')]
+        : [structGroup, h('h3', { class: 'setup-sub' }, 'Prizes'), payoutGroup, antesField]),
+    );
+  };
+
+  const modeGroup = h('div', { class: 'segmented segmented--wide', role: 'radiogroup', 'aria-label': 'Game type' });
+  const renderMode = () =>
+    modeGroup.replaceChildren(
+      ...(
+        [
+          ['tournament', 'Tournament'],
+          ['cash', 'Cash game'],
+        ] as [GameMode, string][]
+      ).map(([mode, label]) => {
+        const b = h('button', { type: 'button', role: 'radio', 'aria-checked': String(setup.mode === mode), class: 'seg' }, label);
+        b.addEventListener('click', () => {
+          if (setup.mode === mode) return;
+          const next =
+            mode === 'cash'
+              ? defaultCashSetup(setup)
+              : { ...defaultSetup(), playerName: setup.playerName, opponents: setup.opponents, difficulty: setup.difficulty };
+          Object.assign(setup, next);
+          renderMode();
+          renderChips();
+        });
+        return b;
+      }),
+    );
+  renderMode();
+  renderChips();
 
   const seedInput = app.dev ? (h('input', { type: 'text', id: 'setup-seed', placeholder: 'Leave empty for a normal game' }) as HTMLInputElement) : null;
   const scenarioSelect = app.dev
@@ -286,7 +419,8 @@ export function renderSetup(app: App, previous: NewGameSetup | null): HTMLElemen
   const form = h(
     'form',
     { class: 'setup-form', novalidate: true },
-    h('header', { class: 'setup-head' }, h('h1', {}, 'New game'), h('p', {}, 'Play until one player holds every chip.')),
+    h('header', { class: 'setup-head' }, h('h1', {}, 'New game'), headline),
+    h('section', { class: 'setup-section' }, h('h2', {}, 'Game'), modeGroup),
     h(
       'section',
       { class: 'setup-section' },
@@ -295,7 +429,7 @@ export function renderSetup(app: App, previous: NewGameSetup | null): HTMLElemen
     ),
     h('section', { class: 'setup-section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Opponents'), countGroup), oppList),
     h('section', { class: 'setup-section' }, h('h2', {}, 'Difficulty'), diffGroup),
-    h('section', { class: 'setup-section' }, h('h2', {}, 'Chips and blinds'), chipsRow, structGroup),
+    chipsSection,
     devSection,
     error,
     h('div', { class: 'setup-actions' }, back, start),
