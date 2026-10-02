@@ -14,11 +14,14 @@ import type { Motion } from './motion.ts';
 import { applyEvent, displayFromSnapshot, displayMismatches, type TableDisplay } from './table-model.ts';
 import type { SidePotInfo, TableView } from './table-view.ts';
 
+/** The parts of the action bar the presenter drives (a replay supplies a stand-in). */
+export type PresenterBar = Pick<ActionBar, 'setHandStrength' | 'idle' | 'request' | 'setHint'> & { readonly waiting: boolean };
+
 export interface PresenterDeps {
   table: TableView;
-  bar: ActionBar;
+  bar: PresenterBar;
   log: LogPanel;
-  audio: AudioEngine;
+  audio: Pick<AudioEngine, 'play'>;
   motion: Motion;
   announcer: Announcer;
   settings: () => Settings;
@@ -29,6 +32,8 @@ export interface PresenterDeps {
   onCashSessionOver?: (summary: CashSummary, snapshot: TableSnapshot) => void;
   /** Resolves when the player asks for the next hand (or immediately if auto-continue is on). */
   waitForNextHand: (autoMs: number) => Promise<void>;
+  /** The coach's one-line suggestion for the player's decision (when coach hints are on). */
+  advise?: (snapshot: TableSnapshot) => Promise<string | null>;
   debug: boolean;
 }
 
@@ -66,6 +71,8 @@ export class DomPresenter implements Presenter {
   #names: string[] = [];
   #humanSeat = 0;
   #lastSnapshot: TableSnapshot | null = null;
+  /** Identifies the current request so late advice never lands on a later decision. */
+  #adviceToken = 0;
 
   constructor(deps: PresenterDeps) {
     this.#d = deps;
@@ -281,7 +288,17 @@ export class DomPresenter implements Presenter {
     this.#d.audio.play('yourTurn');
     const facing = legal.toCall > 0 ? `${chips(legal.toCall)} to call` : 'you can check';
     this.#d.announcer.say(`Your turn — ${facing}. Pot ${chips(legal.pot)}.`, true);
-    return this.#d.bar.request(legal);
+    const token = ++this.#adviceToken;
+    const request = this.#d.bar.request(legal);
+    if (this.#d.advise && this.#d.settings().gameplay.coachHints) {
+      this.#d
+        .advise(snapshot)
+        .then((text) => {
+          if (text && token === this.#adviceToken && this.#d.bar.waiting) this.#d.bar.setHint(text);
+        })
+        .catch(() => undefined);
+    }
+    return request;
   }
 
   thinking(seat: number | null, snapshot: TableSnapshot): void {

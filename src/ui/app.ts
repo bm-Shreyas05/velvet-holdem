@@ -1,11 +1,12 @@
 import { AudioEngine } from '../audio/audio.ts';
 import { ICONS } from '../assets/icons.ts';
+import type { Decision, DecisionRequest } from '../ai/decide.ts';
 import { type AiHost, InlineAiHost, WorkerAiHost } from '../ai/host.ts';
 import { emptyStats as emptyModelStats, observeHand } from '../ai/model.ts';
 import { DIFFICULTIES } from '../ai/profiles.ts';
 import type { HandSettlement } from '../engine/game.ts';
 import type { PublicHandRecord } from '../engine/records.ts';
-import { dailySetup, type NewGameSetup, PAYOUTS, todayKey } from '../game/config.ts';
+import { dailySetup, type NewGameSetup, PAYOUTS, payoutsFor, todayKey } from '../game/config.ts';
 import { type CashSummary, GameController, type GameOverInfo, type TableSnapshot } from '../game/controller.ts';
 import type { HandHistoryRecord } from '../game/history.ts';
 import {
@@ -18,6 +19,7 @@ import {
   reputationPrior,
   unlock,
 } from '../game/progress.ts';
+import { adviceText } from '../game/review.ts';
 import { createSession, type SessionData } from '../game/session.ts';
 import { SPEEDS, type Settings } from '../game/settings.ts';
 import { recordCashSession, recordFinish, recordHand } from '../game/stats.ts';
@@ -29,6 +31,7 @@ import { chips, ordinal, signed } from './format.ts';
 import { LogPanel } from './log-panel.ts';
 import { Motion } from './motion.ts';
 import { DomPresenter } from './presenter.ts';
+import { openReplayer } from './replayer.ts';
 import { renderMenu, renderSetup } from './screens.ts';
 import { openAchievements, openCashSummary, openGameOver, openHelp, openHistory, openPauseMenu, openSettings, openStats } from './sheets.ts';
 import { TableView } from './table-view.ts';
@@ -257,6 +260,7 @@ export class App {
       onGameOver: (info, snap) => this.#gameOver(info, snap),
       onCashSessionOver: (summary) => this.#cashSessionOver(summary),
       waitForNextHand: (autoMs) => this.#waitForNextHand(ts, autoMs),
+      advise: (snap) => this.#advise(session, snap),
       debug: this.dev,
     });
     ts.presenter = presenter;
@@ -376,7 +380,10 @@ export class App {
   cashOut(): void {
     const ts = this.#table;
     if (!ts) return;
-    if (ts.controller.requestCashOut() === 'after-hand') toast('You will cash out when this hand is over.');
+    if (ts.controller.requestCashOut() === 'after-hand') {
+      toast('You will cash out when this hand is over.');
+      this.#renderHeader(ts.header, ts.controller.snapshot());
+    }
   }
 
   get inCashGame(): boolean {
@@ -405,7 +412,8 @@ export class App {
           timer = setTimeout(arm, 300);
           return;
         }
-        timer = setTimeout(done, autoMs);
+        // A sheet opened in the meantime pauses the game: wait for it instead of dealing.
+        timer = setTimeout(() => (ts.controller.paused ? arm() : done()), autoMs);
       };
       arm();
       if (autoMs < 0) btn.focus({ preventScroll: true });
@@ -459,10 +467,10 @@ export class App {
         h('span', { class: 'info-chip info-muted' }, `Cash game · buy-in ${chips(snap.cash.buyIn)}`),
         h(
           'span',
-          { class: `info-chip ${net > 0 ? 'info-pos' : net < 0 ? 'info-neg' : 'info-muted'}`, title: 'Your stack minus everything you bought in for' },
+          { class: `info-chip info-key ${net > 0 ? 'info-pos' : net < 0 ? 'info-neg' : 'info-muted'}`, title: 'Your stack minus everything you bought in for' },
           `Net ${signed(net)}`,
         ),
-        snap.cash.leaving ? h('span', { class: 'info-chip info-muted' }, 'Cashing out after this hand') : null,
+        snap.cash.leaving ? h('span', { class: 'info-chip info-muted info-key' }, 'Cashing out after this hand') : null,
       ].filter((x): x is HTMLElement => x !== null);
     }
     const paid = snap.prizes.length;
@@ -504,6 +512,55 @@ export class App {
 
   openHistory(): void {
     openHistory(this, this.#table?.records ?? this.#savedRecords(), this.#holdTable());
+  }
+
+  /** Runs one AI evaluation (off the main thread when possible). Used by the coach. */
+  aiDecide(request: DecisionRequest): Promise<Decision> {
+    return this.#aiHost().decide(request);
+  }
+
+  /** The game the hand history belongs to: the table in play, or the saved game. */
+  #historySession(): SessionData | null {
+    if (this.#table) return this.#table.controller.session;
+    const r = this.storage.session.load();
+    return r.status === 'ok' ? r.payload : null;
+  }
+
+  /** Replays a hand from the history, optionally with the coach's review open. */
+  openReplay(record: HandHistoryRecord, review = false): void {
+    const session = this.#historySession();
+    const styles = new Map(session?.seats.map((s) => [s.name, s.style]) ?? []);
+    openReplayer(this, record, {
+      stats: session?.statsBook,
+      payouts: session ? payoutsFor(session.setup) : null,
+      styleOf: (name) => styles.get(name) ?? null,
+      review,
+    });
+  }
+
+  /** Counts a completed coach review (towards an achievement). */
+  noteReview(): void {
+    this.#progress((p) => {
+      p.counters.reviews++;
+      return p.counters.reviews >= 10 ? ['student'] : [];
+    });
+  }
+
+  /** The coach's suggestion for the player's current decision, from their own view only. */
+  async #advise(session: SessionData, snap: TableSnapshot): Promise<string | null> {
+    const view = snap.view;
+    if (!view?.legal || view.toAct !== snap.humanSeat) return null;
+    const payouts = payoutsFor(session.setup);
+    const decision = await this.aiDecide({
+      view,
+      style: 'shark',
+      difficulty: 'elite',
+      stats: session.statsBook,
+      tilt: 0,
+      seed: [snap.handNumber >>> 0, view.actions.length + 1, 0x51ed, 0x9e37],
+      ...(payouts && payouts.length > 1 ? { payouts } : {}),
+    });
+    return adviceText(decision, view.legal);
   }
 
   openStats(): void {

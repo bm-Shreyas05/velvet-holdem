@@ -548,6 +548,10 @@ function historyDetail(app: App, r: HandHistoryRecord, back: () => void): HTMLEl
       copy.replaceWith(pre);
     }
   });
+  const replay = h('button', { type: 'button', class: 'btn btn--small btn--primary' }, 'Replay hand');
+  replay.addEventListener('click', () => app.openReplay(r));
+  const coach = h('button', { type: 'button', class: 'btn btn--small' }, 'Review with coach');
+  coach.addEventListener('click', () => app.openReplay(r, true));
   const devCopy = app.dev ? h('button', { type: 'button', class: 'btn btn--small' }, 'Copy replay data') : null;
   devCopy?.addEventListener('click', async () => {
     try {
@@ -573,7 +577,7 @@ function historyDetail(app: App, r: HandHistoryRecord, back: () => void): HTMLEl
     ...streets,
     h('h4', {}, 'Result'),
     results,
-    h('div', { class: 'sheet-actions sheet-actions--left' }, copy, devCopy),
+    h('div', { class: 'sheet-actions sheet-actions--left' }, replay, coach, copy, devCopy),
   );
 }
 

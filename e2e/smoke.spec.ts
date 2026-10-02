@@ -153,3 +153,76 @@ test('installable and playable offline', async ({ page, context, browserName, is
   await context.setOffline(false);
   expect(errors).toEqual([]);
 });
+
+/** Checks when free, calls small bets, folds otherwise — until the current hand is over. */
+async function playOutHand(page: Page): Promise<void> {
+  const passive = page.locator('.act--passive');
+  const fold = page.locator('.act--fold');
+  const deadline = Date.now() + 90_000;
+  while (Date.now() < deadline) {
+    if (await page.locator('.next-hand').isVisible()) return;
+    if ((await passive.isVisible()) && (await passive.isEnabled())) {
+      const label = (await passive.textContent()) ?? '';
+      const target = /^Check/.test(label) || /^Call [0-9]{1,2}\b/.test(label) || !(await fold.isVisible()) ? passive : fold;
+      await target.click({ timeout: 2_000 }).catch(() => undefined);
+    } else await page.waitForTimeout(150);
+  }
+  throw new Error('the hand did not finish');
+}
+
+test('a finished hand can be replayed step by step and reviewed by the coach', async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors = trackErrors(page);
+  await page.goto('./');
+  await startGame(page);
+  await playOutHand(page);
+  await page.getByRole('button', { name: 'Hand history (H)' }).click();
+  await page.locator('.history-row').first().click();
+  await page.getByRole('button', { name: 'Review with coach' }).click();
+  const replay = page.locator('.sheet--replay');
+  await expect(replay.locator('.review-summary')).not.toBeEmpty({ timeout: 30_000 });
+  await expect(replay.locator('.replay-counter')).toHaveText(/^Step 1 of \d+$/);
+  await replay.getByRole('button', { name: 'Next step' }).click();
+  await expect(replay.locator('.replay-counter')).toHaveText(/^Step 2 of \d+$/);
+  await replay.getByRole('button', { name: 'End of the hand' }).click();
+  await expect(replay.locator('.replay-caption')).toContainText('hand over');
+  expect(await replay.locator('.log-entry').count()).toBeGreaterThan(3);
+  expect(errors).toEqual([]);
+});
+
+test('coach hints suggest a move on your turn when switched on', async ({ page }) => {
+  await page.goto('./');
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByText('Coach hints on my turn').click();
+  await page.keyboard.press('Escape');
+  await startGame(page);
+  await expect(page.locator('.act--passive')).toBeEnabled({ timeout: 45_000 });
+  await expect(page.locator('.bar-hint')).toContainText(/^Coach: .+ · your equity ≈ \d+%$/, { timeout: 15_000 });
+});
+
+test('cash game: cashing out mid-hand waits for the hand, then shows the session result', async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors = trackErrors(page);
+  await page.goto('./');
+  await page.getByRole('button', { name: /New game/ }).click();
+  await page.getByRole('radio', { name: 'Cash game' }).click();
+  await page.getByRole('button', { name: 'Deal me in' }).click();
+  await expect(page.getByText(/^Cash game · buy-in/)).toBeVisible();
+  await expect(page.locator('.act--passive')).toBeEnabled({ timeout: 45_000 });
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Cash out' }).click();
+  await expect(page.getByText('Cashing out after this hand')).toBeVisible();
+  await playOutHand(page).catch(() => undefined); // the session ends as this hand finishes
+  await expect(page.getByRole('button', { name: 'New session' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('.summary-list')).toContainText('Hands played');
+  await page.getByRole('button', { name: 'Main menu' }).click();
+  await expect(page.getByRole('button', { name: /^Continue/ })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('daily challenge: today’s table starts from the menu and is marked as the daily', async ({ page }) => {
+  await page.goto('./');
+  await page.getByRole('button', { name: /Daily challenge/ }).click();
+  await expect(page.locator('.info-daily')).toHaveText(/^Daily \d{4}-\d{2}-\d{2}$/);
+  await expect(page.locator('.action-bar')).toBeVisible();
+});

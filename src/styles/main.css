@@ -1447,6 +1447,16 @@ kbd {
   color: var(--ink-2);
 }
 
+.bar-hint {
+  font-size: 0.82em;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.bar-hint:empty {
+  display: none;
+}
+
 .bar-buttons {
   display: flex;
   gap: 8px;
@@ -1624,7 +1634,15 @@ kbd {
   align-items: baseline;
   gap: 6px;
   padding: 2px 0;
-  flex-wrap: wrap;
+}
+
+/* Long sentences wrap beside the dot instead of dropping below it. */
+.log-text {
+  min-width: 0;
+}
+
+.log-entry .inline-cards {
+  flex: none;
 }
 
 .log-dot {
@@ -2361,7 +2379,8 @@ input[type="checkbox"][role="switch"]:checked::after {
     justify-content: flex-start;
   }
 
-  .info-muted:not(:nth-child(3)) {
+  /* Phones keep the level (or game type) and anything marked as key, such as a cash game's net. */
+  .info-muted:not(:nth-child(3)):not(.info-key) {
     display: none;
   }
 
@@ -2528,4 +2547,219 @@ input[type="checkbox"][role="switch"]:checked::after {
   display: block;
   margin-top: 2px;
   font-size: 0.9em;
+}
+
+/* ---- Hand replayer and coach -------------------------------------------------------------- */
+
+.sheet--replay {
+  width: min(1120px, 100%);
+  max-height: min(94vh, 1000px);
+}
+
+/* The sheet body is a flex column: keep the replay's rows at their natural height. */
+.sheet--replay .sheet-body > * {
+  flex-shrink: 0;
+}
+
+.replay-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 10px;
+}
+
+.replay-main > .log-panel {
+  position: static;
+  transform: none;
+  visibility: visible;
+  max-height: min(52vh, 440px);
+  overflow: auto;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  box-shadow: none;
+}
+
+.replay-stage {
+  height: min(52vh, 440px);
+  border-radius: 12px;
+  background: var(--bg-2);
+}
+
+.replay-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+}
+
+.replay-caption {
+  margin: 0;
+  font-weight: 600;
+}
+
+.replay-strength {
+  margin: 0;
+  font: 600 1em / 1.3 var(--font-display);
+  color: var(--ink-2);
+}
+
+.replay-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.replay-controls .btn {
+  min-width: 44px;
+}
+
+.replay-counter {
+  margin: 0 8px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.coach {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+.coach-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.coach-head h3 {
+  margin: 0;
+}
+
+.review-summary {
+  margin: 0;
+  font-weight: 600;
+}
+
+.review-summary:empty {
+  display: none;
+}
+
+.review-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.review-item {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  border-left-width: 4px;
+  background: var(--bg);
+}
+
+.review-item.is-current {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.review-item.verdict-good {
+  border-left-color: var(--pos);
+}
+
+.review-item.verdict-close {
+  border-left-color: var(--warn);
+}
+
+.review-item.verdict-costly {
+  border-left-color: var(--neg);
+}
+
+.review-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.review-pot,
+.review-facts {
+  color: var(--ink-2);
+  font-size: 0.88em;
+}
+
+.review-verdict {
+  margin-left: auto;
+  font-size: 0.82em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.verdict-good .review-verdict {
+  color: var(--pos);
+}
+
+.verdict-close .review-verdict {
+  color: var(--warn);
+}
+
+.verdict-costly .review-verdict {
+  color: var(--neg);
+}
+
+.review-line,
+.review-facts {
+  margin: 6px 0 0;
+}
+
+.review-options {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 4px 8px;
+  font-size: 0.88em;
+}
+
+.review-options li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--surface-2);
+}
+
+.review-options li.is-best {
+  outline: 1px solid var(--pos);
+}
+
+.review-options li.is-chosen {
+  font-weight: 700;
+}
+
+.review-ev {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 760px) {
+  .replay-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .replay-main > .log-panel {
+    display: none;
+  }
+
+  .replay-stage {
+    height: min(46vh, 420px);
+  }
 }

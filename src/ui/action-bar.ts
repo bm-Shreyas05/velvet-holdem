@@ -22,6 +22,7 @@ export class ActionBar {
   #info: HTMLElement;
   #strength: HTMLElement;
   #odds: HTMLElement;
+  #hint: HTMLElement;
   #fold: HTMLButtonElement;
   #passive: HTMLButtonElement;
   #aggressive: HTMLButtonElement;
@@ -41,7 +42,8 @@ export class ActionBar {
     this.#status = h('div', { class: 'bar-status', role: 'status' });
     this.#strength = h('div', { class: 'bar-strength' });
     this.#odds = h('div', { class: 'bar-odds' });
-    this.#info = h('div', { class: 'bar-info' }, this.#strength, this.#odds);
+    this.#hint = h('div', { class: 'bar-hint', 'aria-live': 'polite' });
+    this.#info = h('div', { class: 'bar-info' }, this.#strength, this.#odds, this.#hint);
     this.#fold = h('button', { type: 'button', class: 'act act--fold', 'aria-keyshortcuts': 'F' }) as HTMLButtonElement;
     this.#passive = h('button', { type: 'button', class: 'act act--passive', 'aria-keyshortcuts': 'C' }) as HTMLButtonElement;
     this.#aggressive = h('button', { type: 'button', class: 'act act--aggressive', 'aria-keyshortcuts': 'R' }) as HTMLButtonElement;
@@ -96,6 +98,12 @@ export class ActionBar {
     this.#aggressive.textContent = 'Raise';
     this.#sizing.classList.add('is-hidden');
     this.#odds.textContent = '';
+    this.#hint.textContent = '';
+  }
+
+  /** The coach's suggestion for the current decision (empty to clear). */
+  setHint(text: string): void {
+    this.#hint.textContent = text;
   }
 
   setHandStrength(text: string): void {

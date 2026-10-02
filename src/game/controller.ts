@@ -486,6 +486,7 @@ export class GameController {
       await this.#presenter.handFinished({ record, settlement, blindsRiseNext }, this.snapshot());
     }
     if (humanOut && !settlement.gameOver && !this.#stopped) {
+      await this.#gate(); // never ask over a sheet the player has open
       const choice = await this.#presenter.humanEliminated(humanOut.place, fieldSize, this.snapshot());
       if (choice === 'menu') {
         this.#session.spectate = 'skip';
