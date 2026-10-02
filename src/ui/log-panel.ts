@@ -35,7 +35,12 @@ export class LogPanel {
   }
 
   entry(text: string | Node, tone: Tone | 'street' | 'info' = 'info', cards?: Card[]): void {
-    const li = h('li', { class: `log-entry tone-${tone}` }, h('span', { class: 'log-dot', 'aria-hidden': 'true' }), typeof text === 'string' ? h('span', {}, text) : text);
+    const li = h(
+      'li',
+      { class: `log-entry tone-${tone}` },
+      h('span', { class: 'log-dot', 'aria-hidden': 'true' }),
+      typeof text === 'string' ? h('span', {}, text) : text,
+    );
     if (cards?.length) li.append(' ', this.cardsInline(cards));
     this.#push(li);
   }

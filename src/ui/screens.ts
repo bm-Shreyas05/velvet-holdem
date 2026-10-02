@@ -16,15 +16,27 @@ export function renderMenu(app: App): HTMLElement {
   const fan = h(
     'div',
     { class: 'hero-fan', 'aria-hidden': 'true' },
-    ...parseCards('Ts Js Qs Ks As').map((c, i) => h('img', { class: 'hero-card', style: `--i:${i - 2}`, src: cardFaceUrl(c, { fourColor: app.settings.display.fourColorDeck }), alt: '' })),
+    ...parseCards('Ts Js Qs Ks As').map((c, i) =>
+      h('img', { class: 'hero-card', style: `--i:${i - 2}`, src: cardFaceUrl(c, { fourColor: app.settings.display.fourColorDeck }), alt: '' }),
+    ),
   );
   const primary: HTMLElement[] = [];
-  if (saved && saved.ok) {
-    const cont = h('button', { type: 'button', class: 'menu-btn menu-btn--primary' }, h('span', { class: 'menu-btn-label' }, 'Continue'), h('span', { class: 'menu-btn-sub' }, saved.text));
+  if (saved?.ok) {
+    const cont = h(
+      'button',
+      { type: 'button', class: 'menu-btn menu-btn--primary' },
+      h('span', { class: 'menu-btn-label' }, 'Continue'),
+      h('span', { class: 'menu-btn-sub' }, saved.text),
+    );
     cont.addEventListener('click', () => app.continueGame());
     primary.push(cont);
   }
-  const fresh = h('button', { type: 'button', class: `menu-btn ${saved && saved.ok ? '' : 'menu-btn--primary'}` }, h('span', { class: 'menu-btn-label' }, 'New game'), h('span', { class: 'menu-btn-sub' }, 'Choose opponents, stakes and difficulty'));
+  const fresh = h(
+    'button',
+    { type: 'button', class: `menu-btn ${saved?.ok ? '' : 'menu-btn--primary'}` },
+    h('span', { class: 'menu-btn-label' }, 'New game'),
+    h('span', { class: 'menu-btn-sub' }, 'Choose opponents, stakes and difficulty'),
+  );
   fresh.addEventListener('click', () => app.showSetup());
   primary.push(fresh);
 
@@ -85,8 +97,16 @@ export function renderMenu(app: App): HTMLElement {
       notice,
       h('div', { class: 'menu-primary' }, ...primary),
       secondary,
-      h('p', { class: 'menu-fine' }, 'Cards are shuffled by your browser’s secure random generator. Opponents see only what a real player at the table would see.'),
-      h('p', { class: 'menu-fine menu-fine--legal' }, 'Play money only. Chips have no cash value and cannot be bought, sold or won. Everything stays in this browser.'),
+      h(
+        'p',
+        { class: 'menu-fine' },
+        'Cards are shuffled by your browser’s secure random generator. Opponents see only what a real player at the table would see.',
+      ),
+      h(
+        'p',
+        { class: 'menu-fine menu-fine--legal' },
+        'Play money only. Chips have no cash value and cannot be bought, sold or won. Everything stays in this browser.',
+      ),
     ),
   );
 }
@@ -108,7 +128,11 @@ export function renderSetup(app: App, previous: NewGameSetup | null): HTMLElemen
     countGroup.replaceChildren(
       ...Array.from({ length: MAX_OPPONENTS - MIN_OPPONENTS + 1 }, (_, k) => {
         const n = MIN_OPPONENTS + k;
-        const b = h('button', { type: 'button', role: 'radio', 'aria-checked': String(setup.opponents.length === n), class: 'seg' }, String(n)) as HTMLButtonElement;
+        const b = h(
+          'button',
+          { type: 'button', role: 'radio', 'aria-checked': String(setup.opponents.length === n), class: 'seg' },
+          String(n),
+        ) as HTMLButtonElement;
         b.addEventListener('click', () => {
           while (setup.opponents.length < n) {
             const used = new Set(setup.opponents.map((o) => o.name));
@@ -127,7 +151,13 @@ export function renderSetup(app: App, previous: NewGameSetup | null): HTMLElemen
     oppList.replaceChildren(
       ...setup.opponents.map((o, i) => {
         const avatar = h('div', { class: 'avatar avatar--sm', html: avatarSvg(o.name, o.style === 'random' ? null : o.style) });
-        const name = h('input', { type: 'text', id: `opp-name-${i}`, maxlength: '24', value: o.name, 'aria-label': `Opponent ${i + 1} name` }) as HTMLInputElement;
+        const name = h('input', {
+          type: 'text',
+          id: `opp-name-${i}`,
+          maxlength: '24',
+          value: o.name,
+          'aria-label': `Opponent ${i + 1} name`,
+        }) as HTMLInputElement;
         const blurb = h('p', { class: 'opp-blurb' }, o.style === 'random' ? 'A style is chosen at random when the game starts.' : STYLES[o.style].blurb);
         name.addEventListener('input', () => {
           o.name = name.value;
@@ -157,7 +187,12 @@ export function renderSetup(app: App, previous: NewGameSetup | null): HTMLElemen
     diffGroup.replaceChildren(
       ...DIFFICULTY_ORDER.map((d) => {
         const info = DIFFICULTIES[d];
-        const b = h('button', { type: 'button', role: 'radio', 'aria-checked': String(setup.difficulty === d), class: 'choice' }, h('span', { class: 'choice-title' }, info.label), h('span', { class: 'choice-sub' }, info.blurb)) as HTMLButtonElement;
+        const b = h(
+          'button',
+          { type: 'button', role: 'radio', 'aria-checked': String(setup.difficulty === d), class: 'choice' },
+          h('span', { class: 'choice-title' }, info.label),
+          h('span', { class: 'choice-sub' }, info.blurb),
+        ) as HTMLButtonElement;
         b.addEventListener('click', () => {
           setup.difficulty = d;
           renderDiff();
@@ -176,9 +211,27 @@ export function renderSetup(app: App, previous: NewGameSetup | null): HTMLElemen
   const chipsRow = h(
     'div',
     { class: 'field-row' },
-    numberField('setup-stack', 'Starting chips', () => setup.startingStack, (v) => (setup.startingStack = v), 'Each player starts with this many.'),
-    numberField('setup-sb', 'Small blind', () => setup.smallBlind, (v) => (setup.smallBlind = v), 'Posted left of the button.'),
-    numberField('setup-bb', 'Big blind', () => setup.bigBlind, (v) => (setup.bigBlind = v), 'Also the minimum bet.'),
+    numberField(
+      'setup-stack',
+      'Starting chips',
+      () => setup.startingStack,
+      (v) => (setup.startingStack = v),
+      'Each player starts with this many.',
+    ),
+    numberField(
+      'setup-sb',
+      'Small blind',
+      () => setup.smallBlind,
+      (v) => (setup.smallBlind = v),
+      'Posted left of the button.',
+    ),
+    numberField(
+      'setup-bb',
+      'Big blind',
+      () => setup.bigBlind,
+      (v) => (setup.bigBlind = v),
+      'Also the minimum bet.',
+    ),
   );
 
   const structGroup = h('div', { class: 'choice-grid choice-grid--compact', role: 'radiogroup', 'aria-label': 'Blind structure' });
@@ -186,7 +239,12 @@ export function renderSetup(app: App, previous: NewGameSetup | null): HTMLElemen
     structGroup.replaceChildren(
       ...(Object.keys(STRUCTURES) as Structure[]).map((k) => {
         const info = STRUCTURES[k];
-        const b = h('button', { type: 'button', role: 'radio', 'aria-checked': String(setup.structure === k), class: 'choice' }, h('span', { class: 'choice-title' }, info.label), h('span', { class: 'choice-sub' }, info.blurb)) as HTMLButtonElement;
+        const b = h(
+          'button',
+          { type: 'button', role: 'radio', 'aria-checked': String(setup.structure === k), class: 'choice' },
+          h('span', { class: 'choice-title' }, info.label),
+          h('span', { class: 'choice-sub' }, info.blurb),
+        ) as HTMLButtonElement;
         b.addEventListener('click', () => {
           setup.structure = k;
           renderStruct();
@@ -196,33 +254,31 @@ export function renderSetup(app: App, previous: NewGameSetup | null): HTMLElemen
     );
   renderStruct();
 
-  let seedInput: HTMLInputElement | null = null;
-  let scenarioSelect: HTMLSelectElement | null = null;
-  const devSection = app.dev
-    ? h(
-        'section',
-        { class: 'setup-section setup-dev' },
-        h('h2', {}, 'Developer'),
-        h(
-          'label',
-          { class: 'field', for: 'setup-seed' },
-          h('span', { class: 'field-label' }, 'Seed (reproducible deck and AI choices)'),
-          (seedInput = h('input', { type: 'text', id: 'setup-seed', placeholder: 'Leave empty for a normal game' }) as HTMLInputElement),
-        ),
-        h(
-          'label',
-          { class: 'field', for: 'setup-scenario' },
-          h('span', { class: 'field-label' }, 'First hand'),
-          (scenarioSelect = h(
-            'select',
-            { id: 'setup-scenario' },
-            h('option', { value: '' }, 'Shuffled normally'),
-            ...SCENARIOS.map((sc) => h('option', { value: sc.id }, `${sc.label} (needs ${sc.stacks.length - 1} opponents)`)),
-          ) as HTMLSelectElement),
-          h('span', { class: 'field-hint' }, 'Deals a prepared first hand to check rare situations; the rest of the game is normal.'),
-        ),
-      )
+  const seedInput = app.dev ? (h('input', { type: 'text', id: 'setup-seed', placeholder: 'Leave empty for a normal game' }) as HTMLInputElement) : null;
+  const scenarioSelect = app.dev
+    ? (h(
+        'select',
+        { id: 'setup-scenario' },
+        h('option', { value: '' }, 'Shuffled normally'),
+        ...SCENARIOS.map((sc) => h('option', { value: sc.id }, `${sc.label} (needs ${sc.stacks.length - 1} opponents)`)),
+      ) as HTMLSelectElement)
     : null;
+  const devSection =
+    seedInput && scenarioSelect
+      ? h(
+          'section',
+          { class: 'setup-section setup-dev' },
+          h('h2', {}, 'Developer'),
+          h('label', { class: 'field', for: 'setup-seed' }, h('span', { class: 'field-label' }, 'Seed (reproducible deck and AI choices)'), seedInput),
+          h(
+            'label',
+            { class: 'field', for: 'setup-scenario' },
+            h('span', { class: 'field-label' }, 'First hand'),
+            scenarioSelect,
+            h('span', { class: 'field-hint' }, 'Deals a prepared first hand to check rare situations; the rest of the game is normal.'),
+          ),
+        )
+      : null;
 
   const back = h('button', { type: 'button', class: 'btn' }, 'Back');
   back.addEventListener('click', () => app.showMenu());
@@ -231,7 +287,12 @@ export function renderSetup(app: App, previous: NewGameSetup | null): HTMLElemen
     'form',
     { class: 'setup-form', novalidate: true },
     h('header', { class: 'setup-head' }, h('h1', {}, 'New game'), h('p', {}, 'Play until one player holds every chip.')),
-    h('section', { class: 'setup-section' }, h('h2', {}, 'You'), h('label', { class: 'field', for: 'setup-name' }, h('span', { class: 'field-label' }, 'Your name'), nameInput)),
+    h(
+      'section',
+      { class: 'setup-section' },
+      h('h2', {}, 'You'),
+      h('label', { class: 'field', for: 'setup-name' }, h('span', { class: 'field-label' }, 'Your name'), nameInput),
+    ),
     h('section', { class: 'setup-section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Opponents'), countGroup), oppList),
     h('section', { class: 'setup-section' }, h('h2', {}, 'Difficulty'), diffGroup),
     h('section', { class: 'setup-section' }, h('h2', {}, 'Chips and blinds'), chipsRow, structGroup),
@@ -241,9 +302,9 @@ export function renderSetup(app: App, previous: NewGameSetup | null): HTMLElemen
   );
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    if (seedInput && seedInput.value.trim()) setup.seed = seedInput.value.trim();
+    if (seedInput?.value.trim()) setup.seed = seedInput.value.trim();
     else delete setup.seed;
-    if (scenarioSelect && scenarioSelect.value) setup.scenario = scenarioSelect.value;
+    if (scenarioSelect?.value) setup.scenario = scenarioSelect.value;
     else delete setup.scenario;
     setup.playerName = setup.playerName.trim();
     setup.opponents = setup.opponents.map((o) => ({ ...o, name: o.name.trim() }));

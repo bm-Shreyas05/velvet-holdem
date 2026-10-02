@@ -39,7 +39,9 @@ const UI = "'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, 'Hel
 
 /** The spade mark. `bleed` fills the whole square (maskable / Apple icons); otherwise a disc on transparency. */
 function iconSvg(bleed: boolean): string {
-  const bg = bleed ? '<rect width="100" height="100" fill="url(#g)"/>' : '<circle cx="50" cy="50" r="48" fill="url(#g)"/><circle cx="50" cy="50" r="45.5" fill="none" stroke="#d4b06a" stroke-opacity=".45" stroke-width="1.2"/>';
+  const bg = bleed
+    ? '<rect width="100" height="100" fill="url(#g)"/>'
+    : '<circle cx="50" cy="50" r="48" fill="url(#g)"/><circle cx="50" cy="50" r="45.5" fill="none" stroke="#d4b06a" stroke-opacity=".45" stroke-width="1.2"/>';
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
   <defs><radialGradient id="g" cx="50%" cy="38%" r="70%"><stop offset="0" stop-color="#8a2a3b"/><stop offset="1" stop-color="#4a1019"/></radialGradient>
   <linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f0d592"/><stop offset="1" stop-color="#b98d42"/></linearGradient></defs>
@@ -56,7 +58,10 @@ function socialPage(): string {
   const cards = parseCards('Ts Js Qs Ks As')
     .map((c, i) => `<img src="${cardFaceUrl(c, { fourColor: false })}" style="--i:${i - 2}">`)
     .join('');
-  return page(1200, 630, `
+  return page(
+    1200,
+    630,
+    `
   <style>
     .wrap{position:relative;width:1200px;height:630px;overflow:hidden;font-family:${UI};color:#efe9dc;
       background:radial-gradient(ellipse 75% 70% at 72% 55%, #1f5a45 0%, #123529 45%, #0c110f 100%)}
@@ -82,7 +87,8 @@ function socialPage(): string {
       <span class="pill">FREE · IN YOUR BROWSER · PLAY MONEY</span>
     </div>
     <div class="fan">${cards}</div>
-  </div>`);
+  </div>`,
+  );
 }
 
 const jobs: { file: string; width: number; height: number; html: string }[] = [
@@ -101,18 +107,22 @@ try {
     const src = join(temp, job.file.replace('.png', '.html'));
     writeFileSync(src, job.html);
     const target = join(out, job.file);
-    execFileSync(browser, [
-      '--headless=new',
-      '--disable-gpu',
-      '--hide-scrollbars',
-      '--no-first-run',
-      '--force-device-scale-factor=1',
-      '--default-background-color=00000000',
-      `--user-data-dir=${join(temp, 'profile')}`,
-      `--window-size=${job.width},${job.height}`,
-      `--screenshot=${target}`,
-      pathToFileURL(src).href,
-    ], { stdio: 'pipe', timeout: 60_000 });
+    execFileSync(
+      browser,
+      [
+        '--headless=new',
+        '--disable-gpu',
+        '--hide-scrollbars',
+        '--no-first-run',
+        '--force-device-scale-factor=1',
+        '--default-background-color=00000000',
+        `--user-data-dir=${join(temp, 'profile')}`,
+        `--window-size=${job.width},${job.height}`,
+        `--screenshot=${target}`,
+        pathToFileURL(src).href,
+      ],
+      { stdio: 'pipe', timeout: 60_000 },
+    );
     console.log(`public/${job.file}  ${job.width}×${job.height}`);
   }
 } finally {

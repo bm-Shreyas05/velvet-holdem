@@ -14,11 +14,14 @@
     "evaluate-ai": "node scripts/evaluate-ai.ts",
     "exhaustive": "node scripts/exhaustive-evaluator.ts",
     "gen:preflop": "node scripts/gen-preflop-table.ts",
-    "check": "npm run typecheck && npm test && node scripts/simulate.ts --quick && npm run build",
+    "check": "npm run lint && npm run typecheck && npm test && node scripts/simulate.ts --quick && npm run build",
     "test:e2e": "node scripts/build.mjs && playwright test",
-    "gen:images": "node scripts/gen-images.ts"
+    "gen:images": "node scripts/gen-images.ts",
+    "lint": "biome check .",
+    "format": "biome check --write ."
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.15",
     "@playwright/test": "1.63.0",
     "@types/node": "24.13.6",
     "esbuild": "0.28.2",

@@ -30,7 +30,12 @@ export interface ControlsState {
 export function controlsFor(legal: LegalActions): ControlsState {
   const passive = legal.canCheck
     ? { kind: 'check' as const, label: 'Check', amount: 0, allIn: false }
-    : { kind: 'call' as const, label: legal.callIsAllIn ? `Call ${chips(legal.toCall)} (all-in)` : `Call ${chips(legal.toCall)}`, amount: legal.toCall, allIn: legal.callIsAllIn };
+    : {
+        kind: 'call' as const,
+        label: legal.callIsAllIn ? `Call ${chips(legal.toCall)} (all-in)` : `Call ${chips(legal.toCall)}`,
+        amount: legal.toCall,
+        allIn: legal.callIsAllIn,
+      };
   let aggressive: ControlsState['aggressive'] = null;
   if (legal.aggression) {
     const min = Math.min(Math.max(legal.minTo, legal.fullRaiseTo), legal.maxTo);
@@ -44,13 +49,14 @@ export function controlsFor(legal: LegalActions): ControlsState {
       allInOnly,
     };
   }
-  const potOdds = legal.toCall > 0 ? { toCall: legal.toCall, potAfterCall: legal.pot + legal.toCall, equityNeeded: legal.toCall / (legal.pot + legal.toCall) } : null;
+  const potOdds =
+    legal.toCall > 0 ? { toCall: legal.toCall, potAfterCall: legal.pot + legal.toCall, equityNeeded: legal.toCall / (legal.pot + legal.toCall) } : null;
   return { canFold: legal.canFold, passive, aggressive, potOdds };
 }
 
 function stepFor(bigBlind: number): number {
   if (bigBlind >= 200) return Math.round(bigBlind / 4);
-  if (bigBlind >= 20) return Math.max(5, Math.round(bigBlind / 10) * 5 / 2);
+  if (bigBlind >= 20) return Math.max(5, (Math.round(bigBlind / 10) * 5) / 2);
   return 1;
 }
 
@@ -77,7 +83,10 @@ export function presets(legal: LegalActions): Preset[] {
 
 /** Accepts "1200", "1,200", " 1 200 ", "1.5k". Returns null for anything else. */
 export function parseAmount(text: string): number | null {
-  const t = text.trim().toLowerCase().replace(/[,\s_]/g, '');
+  const t = text
+    .trim()
+    .toLowerCase()
+    .replace(/[,\s_]/g, '');
   if (!t) return null;
   const m = /^(\d+(?:\.\d+)?)(k)?$/.exec(t);
   if (!m) return null;

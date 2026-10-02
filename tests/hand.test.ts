@@ -16,7 +16,10 @@ test('blinds are posted and action starts under the gun', () => {
   const v = hand.viewFor(null);
   assert.equal(v.smallBlindSeat, 1);
   assert.equal(v.bigBlindSeat, 2);
-  assert.deepEqual(v.seats.map((s) => s.streetCommit), [0, 25, 50, 0]);
+  assert.deepEqual(
+    v.seats.map((s) => s.streetCommit),
+    [0, 25, 50, 0],
+  );
   assert.equal(v.pot, 75);
   assert.equal(hand.toAct, 3);
   const legal = hand.legalActions()!;
@@ -174,7 +177,10 @@ test('multiple all-ins with different stacks build exact side pots', () => {
     ],
   );
   assert.deepEqual(stacksOf(hand), [400, 600, 600, 400]);
-  assert.equal(stacksOf(hand).reduce((a, b) => a + b, 0), 2000);
+  assert.equal(
+    stacksOf(hand).reduce((a, b) => a + b, 0),
+    2000,
+  );
   // All-in: every hand is turned over before the run-out.
   const reveals = events.filter((e) => e.type === 'reveal');
   assert.equal(reveals.length, 4);
@@ -194,7 +200,10 @@ test('a short all-in wins the main pot and the uncalled excess is returned', () 
   assert.ok(hand.isComplete);
   const r = hand.result!;
   // Main: 100×2 (seats 0,1) + 50 (seat 2's blind) + 50 (seat 3's limp) = 300, won by aces.
-  assert.deepEqual(r.pots.map((p) => [p.amount, p.winners]), [[300, [0]]]);
+  assert.deepEqual(
+    r.pots.map((p) => [p.amount, p.winners]),
+    [[300, [0]]],
+  );
   assert.deepEqual(r.uncalled, [{ seat: 1, amount: 300 }]);
   assert.deepEqual(stacksOf(hand), [300, 900, 950, 950]);
 });
@@ -279,11 +288,7 @@ test('three-way tie splits the pot evenly', () => {
 });
 
 test('kicker decides between two pairs of the same rank', () => {
-  const { hand } = startHand(
-    { handNumber: 1, seats: seats(1000, 1000), button: 0, blinds: BLINDS },
-    { 0: 'Ah Qc', 1: 'Ad Jc' },
-    'As 8d 5c 3h 2s',
-  );
+  const { hand } = startHand({ handNumber: 1, seats: seats(1000, 1000), button: 0, blinds: BLINDS }, { 0: 'Ah Qc', 1: 'Ad Jc' }, 'As 8d 5c 3h 2s');
   play(hand, [
     [0, 'call'],
     [1, 'check'],
@@ -343,7 +348,10 @@ test('antes are dead money and go into the pot', () => {
   const { hand } = startHand({ handNumber: 1, seats: seats(1000, 1000, 1000), button: 0, blinds: { smallBlind: 25, bigBlind: 50, ante: 10 } });
   const v = hand.viewFor(null);
   assert.equal(v.pot, 105);
-  assert.deepEqual(v.seats.map((s) => s.streetCommit), [0, 25, 50]);
+  assert.deepEqual(
+    v.seats.map((s) => s.streetCommit),
+    [0, 25, 50],
+  );
   play(hand, [
     [0, 'fold'],
     [1, 'fold'],
@@ -358,11 +366,7 @@ test('showdown: last aggressor shows first and a beaten hand is mucked', () => {
     [0, 'call'],
     [1, 'call'],
     [2, 'check'],
-    ...(['flop', 'turn'] as const).flatMap(() => [
-      [1, 'check'] as [number, 'check'],
-      [2, 'check'] as [number, 'check'],
-      [0, 'check'] as [number, 'check'],
-    ]),
+    ...(['flop', 'turn'] as const).flatMap(() => [[1, 'check'] as [number, 'check'], [2, 'check'] as [number, 'check'], [0, 'check'] as [number, 'check']]),
     [1, 'check'],
     [2, 'bet', 100],
     [0, 'call'],
@@ -490,10 +494,7 @@ test('fuzz: thousands of random hands keep every invariant', () => {
   for (let i = 0; i < 3000; i++) {
     const n = 2 + (i % 7);
     const stacks = Array.from({ length: n }, () => 20 + (rng.nextUint32() % 1500));
-    const { hand, events } = HoldemHand.start(
-      { handNumber: i + 1, seats: seats(...stacks), button: i % n, blinds: BLINDS },
-      Deck.shuffled(rng),
-    );
+    const { hand, events } = HoldemHand.start({ handNumber: i + 1, seats: seats(...stacks), button: i % n, blinds: BLINDS }, Deck.shuffled(rng));
     const all: HandEvent[] = [...events];
     let guard = 0;
     while (!hand.isComplete) {
@@ -505,7 +506,10 @@ test('fuzz: thousands of random hands keep every invariant', () => {
     const r = hand.result!;
     if (r.showdown) showdowns++;
     if (r.pots.length > 1) sidePots++;
-    assert.equal(r.finalStacks.reduce((a, b) => a + b, 0), stacks.reduce((a, b) => a + b, 0));
+    assert.equal(
+      r.finalStacks.reduce((a, b) => a + b, 0),
+      stacks.reduce((a, b) => a + b, 0),
+    );
     assert.equal(all.filter((e) => e.type === 'hand-end').length, 1);
   }
   assert.ok(showdowns > 300, `showdowns ${showdowns}`);

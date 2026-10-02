@@ -213,7 +213,8 @@ export function observeHand(book: StatsBook, record: PublicHandRecord, decay = R
   const idOf = new Map(record.players.map((p) => [p.seat, p.id]));
   const statsOf = (seat: number): PlayerStats => {
     const id = idOf.get(seat)!;
-    return (book[id] ??= emptyStats());
+    book[id] ??= emptyStats();
+    return book[id];
   };
 
   for (const p of record.players) {

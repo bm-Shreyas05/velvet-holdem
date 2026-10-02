@@ -19,8 +19,7 @@ export function randomLegalAction(legal: LegalActions, rng: Rng): PlayerAction {
   const roll = randomUnit(rng);
   if (legal.aggression && roll < 0.3) {
     const pick = randomInt(rng, 4);
-    const target =
-      pick === 0 ? legal.minTo : pick === 1 ? legal.maxTo : legal.fullRaiseTo + randomInt(rng, Math.max(1, legal.maxTo - legal.fullRaiseTo + 1));
+    const target = pick === 0 ? legal.minTo : pick === 1 ? legal.maxTo : legal.fullRaiseTo + randomInt(rng, Math.max(1, legal.maxTo - legal.fullRaiseTo + 1));
     return { kind: legal.aggression, to: legalRaiseTo(legal, target) };
   }
   if (legal.canFold && roll < 0.45) return { kind: 'fold' };

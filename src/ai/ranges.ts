@@ -146,7 +146,12 @@ export function targetsFor(entry: ActionLogEntry, t: Tendencies, view: HandView)
   }
   // Bluffing into several opponents is rarer than heads-up.
   const idx = view.actions.indexOf(entry);
-  const foldedBefore = new Set(view.actions.slice(0, Math.max(0, idx)).filter((a) => a.kind === 'fold').map((a) => a.seat));
+  const foldedBefore = new Set(
+    view.actions
+      .slice(0, Math.max(0, idx))
+      .filter((a) => a.kind === 'fold')
+      .map((a) => a.seat),
+  );
   const opponentsLeft = view.seats.filter((s) => s.inHand && s.seat !== entry.seat && !foldedBefore.has(s.seat)).length;
   const multiway = 1 / (1 + 0.5 * Math.max(0, opponentsLeft - 1));
   if (entry.facing === 0) return [t.betFreq, 0, t.bluff * multiway];
@@ -208,7 +213,7 @@ export function buildRange(seat: number, ctx: RangeContext): OpponentRange {
       entry.facing > 0 ? foldFreq : 0,
       Math.min(0.4, bluff),
       maxAggressFor(entry),
-      aggressive && !preflop ? Math.min(1.6, Math.max(0.12, Math.pow(0.66 / Math.max(0.05, sizeRatio), 0.6))) : 1,
+      aggressive && !preflop ? Math.min(1.6, Math.max(0.12, (0.66 / Math.max(0.05, sizeRatio)) ** 0.6)) : 1,
     );
     // An all-in "call" or a raise by a very short stack carries less information.
     const depth = ctx.depth * (entry.allIn && !aggressive ? 0.6 : 1);
@@ -221,7 +226,7 @@ export function buildRange(seat: number, ctx: RangeContext): OpponentRange {
       }
       const a = model.aggress(s);
       const likelihood = aggressive ? a : Math.max(0, 1 - a - model.fold(s));
-      w[k]! *= FLOOR + (1 - FLOOR) * Math.pow(likelihood, depth);
+      w[k]! *= FLOOR + (1 - FLOOR) * likelihood ** depth;
     }
   }
 

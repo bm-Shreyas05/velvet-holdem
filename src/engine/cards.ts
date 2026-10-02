@@ -11,12 +11,8 @@ export const RANK_CHARS = '23456789TJQKA';
 export const SUIT_CHARS = 'cdhs';
 export const DECK_SIZE = 52;
 
-export const RANK_NAMES = [
-  'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Jack', 'Queen', 'King', 'Ace',
-] as const;
-export const RANK_PLURALS = [
-  'Twos', 'Threes', 'Fours', 'Fives', 'Sixes', 'Sevens', 'Eights', 'Nines', 'Tens', 'Jacks', 'Queens', 'Kings', 'Aces',
-] as const;
+export const RANK_NAMES = ['Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Jack', 'Queen', 'King', 'Ace'] as const;
+export const RANK_PLURALS = ['Twos', 'Threes', 'Fours', 'Fives', 'Sixes', 'Sevens', 'Eights', 'Nines', 'Tens', 'Jacks', 'Queens', 'Kings', 'Aces'] as const;
 export const SUIT_NAMES = ['clubs', 'diamonds', 'hearts', 'spades'] as const;
 
 export function makeCard(rank: number, suit: number): Card {

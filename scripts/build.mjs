@@ -69,4 +69,6 @@ const version = hash.digest('hex').slice(0, 12);
 const sw = (await readFile(resolve(root, 'src/pwa/sw.js'), 'utf8')).replaceAll('__VERSION__', version).replaceAll('__ASSETS__', JSON.stringify(assets));
 await writeFile(resolve(root, 'dist/sw.js'), sw);
 const kb = (n) => `${(n / 1024).toFixed(0)} KB`;
-console.log(`Built dist/index.html (${kb(html.length)}; app ${kb(js.length)}, AI worker ${kb(workerCode.length)}, styles ${kb(styles.length)}), service worker ${version}${siteUrl ? ` for ${siteUrl}` : ''} in ${Math.round(performance.now() - t0)} ms`);
+console.log(
+  `Built dist/index.html (${kb(html.length)}; app ${kb(js.length)}, AI worker ${kb(workerCode.length)}, styles ${kb(styles.length)}), service worker ${version}${siteUrl ? ` for ${siteUrl}` : ''} in ${Math.round(performance.now() - t0)} ms`,
+);

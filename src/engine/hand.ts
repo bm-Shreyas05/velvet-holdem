@@ -365,7 +365,7 @@ export class HoldemHand {
   validate(seat: number, action: PlayerAction): void {
     const s = this.#s;
     if (s.phase === 'complete') throw new IllegalActionError('The hand is over.');
-    if (s.toAct !== seat) throw new IllegalActionError('It is not this player\'s turn.');
+    if (s.toAct !== seat) throw new IllegalActionError("It is not this player's turn.");
     const legal = this.#legalFor(seat);
     switch (action?.kind) {
       case 'fold':
@@ -380,9 +380,7 @@ export class HoldemHand {
       case 'bet':
       case 'raise': {
         if (legal.aggression !== action.kind) {
-          throw new IllegalActionError(
-            legal.aggression ? `You can ${legal.aggression}, not ${action.kind}.` : 'Raising is not allowed here.',
-          );
+          throw new IllegalActionError(legal.aggression ? `You can ${legal.aggression}, not ${action.kind}.` : 'Raising is not allowed here.');
         }
         const to = action.to;
         if (typeof to !== 'number' || !Number.isInteger(to)) throw new IllegalActionError('The amount must be a whole number of chips.');
@@ -615,9 +613,7 @@ export class HoldemHand {
       }
     }
 
-    const pots = buildPots(
-      s.seats.map((p, seat) => ({ seat, amount: p.inHand ? p.totalCommit : 0, folded: !p.inHand || p.folded })),
-    );
+    const pots = buildPots(s.seats.map((p, seat) => ({ seat, amount: p.inHand ? p.totalCommit : 0, folded: !p.inHand || p.folded })));
     const seatOrder = this.#orderFrom(s.button);
     const results: PotResult[] = pots.map((pot, index) => {
       let top = -1;
@@ -803,7 +799,7 @@ export class HoldemHand {
 
     if (s.toAct !== null) {
       const p = s.seats[s.toAct];
-      if (!p || !p.inHand || p.folded || p.allIn) problems.push('the player to act cannot act');
+      if (!p?.inHand || p.folded || p.allIn) problems.push('the player to act cannot act');
       if (s.phase === 'complete') problems.push('a completed hand has a player to act');
       if (!this.#needsToAct(s.toAct)) problems.push('the player to act does not need to act');
     } else if (s.phase !== 'complete') {
@@ -855,7 +851,7 @@ export class HoldemHand {
   }
 
   static restore(data: HandStateData): HoldemHand {
-    if (!data || data.version !== 1 || !Array.isArray(data.seats) || !data.deck) {
+    if (data?.version !== 1 || !Array.isArray(data.seats) || !data.deck) {
       throw new Error('Unrecognised hand data');
     }
     const copy = structuredClone(data);

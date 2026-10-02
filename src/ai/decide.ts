@@ -288,7 +288,7 @@ export function decide(req: DecisionRequest): Decision {
   if (!legal || me === null || view.toAct !== me) throw new Error("decide() was called when it is not this player's turn");
   const mine = view.seats[me]!;
   const hole = mine.holeCards;
-  if (!hole || hole.length !== 2) throw new Error('The deciding player has no hole cards');
+  if (hole?.length !== 2) throw new Error('The deciding player has no hole cards');
 
   const profile: PersonalityProfile = STYLES[req.style];
   const diff: DifficultySettings = DIFFICULTIES[req.difficulty];
@@ -404,7 +404,6 @@ export function decide(req: DecisionRequest): Decision {
     }
   }
 
-
   /** The range opponents credit this player with when putting in `add` more. */
   function perceived(add: number): PerceivedRange {
     if (street === 'preflop') {
@@ -416,8 +415,7 @@ export function decide(req: DecisionRequest): Decision {
     let top = clamp(0.32 * Math.sqrt(0.66 / Math.max(0.2, ratio)), 0.1, 0.55) * (0.8 + ownView.betFreq / 2);
     // Raises are read as stronger and rarely bluffs; bigger bets as more polarised.
     if (raiseCount > 0) top *= 0.55;
-    const bluff =
-      raiseCount > 0 ? clamp(ownView.bluff * 0.4, 0.04, 0.2) : clamp(ownView.bluff * (0.8 + 0.3 * Math.min(2, ratio)), 0.08, 0.5);
+    const bluff = raiseCount > 0 ? clamp(ownView.bluff * 0.4, 0.04, 0.2) : clamp(ownView.bluff * (0.8 + 0.3 * Math.min(2, ratio)), 0.08, 0.5);
     return { top, bluff, bluffLo: 0, bluffHi: street === 'river' ? 0.35 : 0.45, width };
   }
 
@@ -517,10 +515,15 @@ export function decide(req: DecisionRequest): Decision {
     eqCalled = calledSamples ? eqCalled / calledSamples : eqAll;
     eqRaised = raisedSamples ? eqRaised / raisedSamples : 0;
     const rCalled = iAmAllIn ? 1 : realization(eqCalled, streetsLeft, inPosition, 1);
-    const behindCalled = iAmAllIn
-      ? 0
-      : Math.min(myTotal - to, Math.max(0, ...opps.map((o, j) => (canRespond[j] ? o.stack - callAdd[j]! : 0))));
-    const impliedCalled = impliedValue(eqCalled, behindCalled, pot + 2 * add, streetsLeft, inPosition, extractionOf(callerCount ? callerStrength / callerCount : 0.5));
+    const behindCalled = iAmAllIn ? 0 : Math.min(myTotal - to, Math.max(0, ...opps.map((o, j) => (canRespond[j] ? o.stack - callAdd[j]! : 0))));
+    const impliedCalled = impliedValue(
+      eqCalled,
+      behindCalled,
+      pot + 2 * add,
+      streetsLeft,
+      inPosition,
+      extractionOf(callerCount ? callerStrength / callerCount : 0.5),
+    );
 
     // Facing a re-raise: continue only if the price is right for our equity against it.
     const shoveTo = Math.max(0, ...opps.map((o, j) => (canRespond[j] && callAdd[j]! >= 0.4 * o.stack ? o.streetCommit + o.stack : 0)));
@@ -592,7 +595,9 @@ export function decide(req: DecisionRequest): Decision {
     const pClass = classWeights[i]! / classTotal;
     const inner = c.members.map((m) => Math.exp((m.utility - c.best.utility) / (temperature * 0.6)));
     const innerTotal = inner.reduce((a, b) => a + b, 0);
-    c.members.forEach((m, t) => probabilities.set(m, (pClass * inner[t]!) / innerTotal));
+    c.members.forEach((m, t) => {
+      probabilities.set(m, (pClass * inner[t]!) / innerTotal);
+    });
   });
 
   let roll = randomUnit(rng);

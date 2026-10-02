@@ -52,7 +52,14 @@ export class ActionBar {
     this.#presets = h('div', { class: 'presets', role: 'group', 'aria-label': 'Bet size presets' });
     this.#slider = h('input', { type: 'range', class: 'bet-slider', id: 'bet-slider', 'aria-label': 'Bet amount' }) as HTMLInputElement;
     this.#slider.addEventListener('input', () => this.#setAmount(Number(this.#slider.value), false));
-    this.#input = h('input', { type: 'text', inputmode: 'numeric', class: 'bet-input', id: 'bet-input', 'aria-label': 'Bet amount in chips', autocomplete: 'off' }) as HTMLInputElement;
+    this.#input = h('input', {
+      type: 'text',
+      inputmode: 'numeric',
+      class: 'bet-input',
+      id: 'bet-input',
+      'aria-label': 'Bet amount in chips',
+      autocomplete: 'off',
+    }) as HTMLInputElement;
     this.#input.addEventListener('change', () => this.#commitTyped());
     this.#input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {

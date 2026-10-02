@@ -18,9 +18,7 @@ import { PREFLOP_EQUITY_HU } from './preflop-table.ts';
 
 const PREFLOP = (() => {
   const out = new Float32Array(COMBO_COUNT);
-  const order = Array.from({ length: COMBO_COUNT }, (_, k) => k).sort(
-    (x, y) => PREFLOP_EQUITY_HU[COMBO_CLASS[x]!]! - PREFLOP_EQUITY_HU[COMBO_CLASS[y]!]!,
-  );
+  const order = Array.from({ length: COMBO_COUNT }, (_, k) => k).sort((x, y) => PREFLOP_EQUITY_HU[COMBO_CLASS[x]!]! - PREFLOP_EQUITY_HU[COMBO_CLASS[y]!]!);
   let i = 0;
   while (i < order.length) {
     let j = i;

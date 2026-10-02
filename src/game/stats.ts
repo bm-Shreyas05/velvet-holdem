@@ -121,7 +121,8 @@ export function recordHand(stats: PlayerStats, record: HandHistoryRecord): void 
   // shares, so the chips moving between two players in a pot are exact.
   for (const opp of record.players) {
     if (opp.seat === seat) continue;
-    const entry = (stats.opponents[opp.name] ??= { hands: 0, net: 0, showdownsWon: 0, showdownsLost: 0 });
+    stats.opponents[opp.name] ??= { hands: 0, net: 0, showdownsWon: 0, showdownsLost: 0 };
+    const entry = stats.opponents[opp.name];
     entry.hands++;
     for (const pot of record.pots) {
       if (pot.amount <= 0) continue;
@@ -174,7 +175,8 @@ export function mergeInto(target: PlayerStats, source: PlayerStats): void {
   target.biggestLoss = Math.max(target.biggestLoss, source.biggestLoss);
   if (source.bestHand && (!target.bestHand || source.bestHand.score > target.bestHand.score)) target.bestHand = source.bestHand;
   for (const [name, r] of Object.entries(source.opponents)) {
-    const t = (target.opponents[name] ??= { hands: 0, net: 0, showdownsWon: 0, showdownsLost: 0 });
+    target.opponents[name] ??= { hands: 0, net: 0, showdownsWon: 0, showdownsLost: 0 };
+    const t = target.opponents[name];
     t.hands += r.hands;
     t.net += r.net;
     t.showdownsWon += r.showdownsWon;

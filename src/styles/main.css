@@ -38,8 +38,8 @@
   --rail-1: #3b2519;
   --rail-2: #1d120c;
 
-  --font-display: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
-  --font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Roboto, Arial, sans-serif;
+  --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Roboto, Arial, sans-serif;
   --ui-scale: 1;
   --fs: calc(15px * var(--ui-scale));
   --radius: 12px;
@@ -47,7 +47,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
+  :root:not([data-theme="light"]) {
     --bg: #0c110f;
     --bg-2: #141b18;
     --surface: #171f1b;
@@ -68,7 +68,7 @@
   }
 }
 
-:root[data-theme='dark'] {
+:root[data-theme="dark"] {
   --bg: #0c110f;
   --bg-2: #141b18;
   --surface: #171f1b;
@@ -143,7 +143,7 @@ button:disabled {
 }
 
 kbd {
-  font: 600 0.72em/1 var(--font-ui);
+  font: 600 0.72em / 1 var(--font-ui);
   padding: 2px 5px;
   border-radius: 4px;
   border: 1px solid currentColor;
@@ -199,7 +199,10 @@ kbd {
   border: 1px solid var(--line);
   background: var(--surface-2);
   font-weight: 600;
-  transition: background 0.15s, border-color 0.15s, transform 0.08s;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    transform 0.08s;
 }
 
 .btn:hover {
@@ -261,9 +264,7 @@ kbd {
   place-items: center;
   overflow: auto;
   padding: 24px 16px;
-  background:
-    radial-gradient(ellipse 70% 55% at 50% 38%, color-mix(in srgb, #1f5a45 55%, var(--bg)) 0%, transparent 70%),
-    var(--bg);
+  background: radial-gradient(ellipse 70% 55% at 50% 38%, color-mix(in srgb, #1f5a45 55%, var(--bg)) 0%, transparent 70%), var(--bg);
 }
 
 .menu-card {
@@ -333,7 +334,10 @@ kbd {
   border: 1px solid var(--line);
   background: var(--surface);
   text-align: left;
-  transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    transform 0.1s,
+    box-shadow 0.15s;
 }
 
 .menu-btn:hover {
@@ -348,7 +352,7 @@ kbd {
 }
 
 .menu-btn-label {
-  font: 600 1.15em/1.2 var(--font-display);
+  font: 600 1.15em / 1.2 var(--font-display);
 }
 
 .menu-btn-sub {
@@ -439,7 +443,7 @@ kbd {
 
 .setup-head h1 {
   margin: 0;
-  font: 600 2.2em/1.1 var(--font-display);
+  font: 600 2.2em / 1.1 var(--font-display);
 }
 
 .setup-head p {
@@ -459,7 +463,7 @@ kbd {
 
 .setup-section h2 {
   margin: 0;
-  font: 600 1.05em/1.2 var(--font-ui);
+  font: 600 1.05em / 1.2 var(--font-ui);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ink-2);
@@ -570,7 +574,7 @@ kbd {
   color: var(--ink-2);
 }
 
-.seg[aria-checked='true'] {
+.seg[aria-checked="true"] {
   background: var(--accent);
   color: var(--accent-ink);
 }
@@ -592,7 +596,7 @@ kbd {
   background: var(--bg);
 }
 
-.choice[aria-checked='true'] {
+.choice[aria-checked="true"] {
   border-color: var(--accent);
   background: var(--accent-soft);
   box-shadow: inset 0 0 0 1px var(--accent);
@@ -625,9 +629,7 @@ kbd {
 .screen-table {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  background:
-    radial-gradient(ellipse 80% 70% at 50% 45%, color-mix(in srgb, #2a3a33 55%, var(--bg)) 0%, var(--bg) 75%),
-    var(--bg);
+  background: radial-gradient(ellipse 80% 70% at 50% 45%, color-mix(in srgb, #2a3a33 55%, var(--bg)) 0%, var(--bg) 75%), var(--bg);
 }
 
 .topbar {
@@ -649,7 +651,7 @@ kbd {
 }
 
 .brand-mark {
-  font: italic 600 1.45em/1 var(--font-display);
+  font: italic 600 1.45em / 1 var(--font-display);
   color: var(--accent);
 }
 
@@ -731,13 +733,13 @@ kbd {
   --felt-3: #0a2a1f;
 }
 
-.stage[data-felt='navy'] {
+.stage[data-felt="navy"] {
   --felt-1: #2b4f80;
   --felt-2: #132a4b;
   --felt-3: #0b1a31;
 }
 
-.stage[data-felt='claret'] {
+.stage[data-felt="claret"] {
   --felt-1: #7c2c3b;
   --felt-2: #45131f;
   --felt-3: #2c0b13;
@@ -748,9 +750,7 @@ kbd {
   position: absolute;
   border-radius: 999px;
   padding: 20px;
-  background:
-    radial-gradient(ellipse at 50% 0%, rgba(255, 225, 190, 0.18), transparent 60%),
-    linear-gradient(180deg, var(--rail-1), var(--rail-2));
+  background: radial-gradient(ellipse at 50% 0%, rgba(255, 225, 190, 0.18), transparent 60%), linear-gradient(180deg, var(--rail-1), var(--rail-2));
   box-shadow:
     0 30px 60px rgba(0, 0, 0, 0.55),
     0 0 0 2px rgba(0, 0, 0, 0.6),
@@ -766,12 +766,14 @@ kbd {
   background:
     radial-gradient(ellipse 60% 55% at 50% 42%, rgba(255, 255, 240, 0.13), transparent 70%),
     radial-gradient(ellipse at 50% 50%, var(--felt-1) 0%, var(--felt-2) 72%, var(--felt-3) 100%);
-  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.55), inset 0 0 0 3px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    inset 0 0 40px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 3px rgba(0, 0, 0, 0.35);
   overflow: hidden;
 }
 
 .table-felt::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 16px;
   border-radius: 999px;
@@ -779,7 +781,7 @@ kbd {
 }
 
 .table-felt::after {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
   opacity: 0.22;
@@ -804,12 +806,12 @@ kbd {
 }
 
 .felt-title {
-  font: italic 600 64px/1 var(--font-display);
+  font: italic 600 64px / 1 var(--font-display);
   color: #f5e7c1;
 }
 
 .felt-sub {
-  font: 600 11px/1.6 var(--font-ui);
+  font: 600 11px / 1.6 var(--font-ui);
   letter-spacing: 0.35em;
   text-transform: uppercase;
   color: #f5e7c1;
@@ -845,7 +847,7 @@ kbd {
   transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
-.card[data-up='false'] .card-inner {
+.card[data-up="false"] .card-inner {
   transform: rotateY(180deg);
 }
 
@@ -868,8 +870,8 @@ kbd {
 
 /* Hide the turned-away side explicitly too: some WebKit builds ignore backface-visibility and
    would paint the back over the face. Flips swap the sides at the edge-on moment (table-view). */
-.card[data-up='true'] .card-back,
-.card[data-up='false'] .card-face {
+.card[data-up="true"] .card-back,
+.card[data-up="false"] .card-face {
   visibility: hidden;
 }
 
@@ -879,7 +881,9 @@ kbd {
 }
 
 .card.is-winning .card-face {
-  box-shadow: 0 0 0 2px var(--gold), 0 0 18px rgba(233, 200, 119, 0.7);
+  box-shadow:
+    0 0 0 2px var(--gold),
+    0 0 18px rgba(233, 200, 119, 0.7);
 }
 
 .card.is-dimmed {
@@ -1001,11 +1005,15 @@ kbd {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font: 800 14px/1 var(--font-display);
+  font: 800 14px / 1 var(--font-display);
   color: #1b1b1b;
   background: radial-gradient(circle at 35% 30%, #ffffff, #dcd6c6);
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.5), inset 0 0 0 2px #b6ad97;
-  transition: left 0.6s cubic-bezier(0.2, 0.7, 0.2, 1), top 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+  box-shadow:
+    0 3px 6px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 2px #b6ad97;
+  transition:
+    left 0.6s cubic-bezier(0.2, 0.7, 0.2, 1),
+    top 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 /* ---- Seats --------------------------------------------------------------------------------- */
@@ -1073,7 +1081,9 @@ kbd {
   background: var(--plate);
   border: 1px solid var(--plate-line);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.5);
-  transition: box-shadow 0.25s, opacity 0.25s;
+  transition:
+    box-shadow 0.25s,
+    opacity 0.25s;
 }
 
 .seat--hero .seat-plate {
@@ -1111,7 +1121,7 @@ kbd {
 
 .blind-chip {
   margin-left: auto;
-  font: 800 10px/1 var(--font-ui);
+  font: 800 10px / 1 var(--font-ui);
   padding: 5px 6px;
   border-radius: 999px;
   color: #1e1a10;
@@ -1123,7 +1133,7 @@ kbd {
   position: absolute;
   z-index: 2;
   right: 2px;
-  font: 700 10px/1 var(--font-ui);
+  font: 700 10px / 1 var(--font-ui);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   padding: 4px 7px;
@@ -1152,7 +1162,7 @@ kbd {
   left: 50%;
   top: calc(100% + 6px);
   transform: translate(-50%, 0);
-  font: 700 12.5px/1 var(--font-ui);
+  font: 700 12.5px / 1 var(--font-ui);
   padding: 5px 11px;
   border-radius: 999px;
   white-space: nowrap;
@@ -1215,7 +1225,7 @@ kbd {
   left: 50%;
   bottom: calc(100% + 2px);
   transform: translate(-50%, 0);
-  font: 700 12px/1.2 var(--font-ui);
+  font: 700 12px / 1.2 var(--font-ui);
   padding: 4px 10px;
   border-radius: 8px;
   background: rgba(10, 12, 11, 0.88);
@@ -1255,7 +1265,10 @@ kbd {
 }
 
 .seat.is-turn .seat-plate {
-  box-shadow: 0 0 0 2px var(--brass), 0 0 22px rgba(212, 176, 106, 0.55), 0 8px 18px rgba(0, 0, 0, 0.5);
+  box-shadow:
+    0 0 0 2px var(--brass),
+    0 0 22px rgba(212, 176, 106, 0.55),
+    0 8px 18px rgba(0, 0, 0, 0.5);
 }
 
 .seat.is-thinking .seat-status {
@@ -1265,7 +1278,10 @@ kbd {
 }
 
 .seat.is-winner .seat-plate {
-  box-shadow: 0 0 0 2px var(--gold), 0 0 30px rgba(233, 200, 119, 0.65), 0 8px 18px rgba(0, 0, 0, 0.5);
+  box-shadow:
+    0 0 0 2px var(--gold),
+    0 0 30px rgba(233, 200, 119, 0.65),
+    0 8px 18px rgba(0, 0, 0, 0.5);
 }
 
 @keyframes breathe {
@@ -1290,7 +1306,9 @@ kbd {
   background: rgba(9, 12, 10, 0.88);
   border: 1px solid rgba(233, 200, 119, 0.55);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
-  transition: opacity 0.25s, transform 0.25s;
+  transition:
+    opacity 0.25s,
+    transform 0.25s;
 }
 
 .stage--portrait .table-banner {
@@ -1303,7 +1321,7 @@ kbd {
 }
 
 .banner-title {
-  font: italic 600 26px/1.15 var(--font-display);
+  font: italic 600 26px / 1.15 var(--font-display);
   color: var(--gold);
 }
 
@@ -1358,7 +1376,7 @@ kbd {
 }
 
 .bar-strength {
-  font: 600 1.05em/1.3 var(--font-display);
+  font: 600 1.05em / 1.3 var(--font-display);
 }
 
 .bar-odds {
@@ -1383,7 +1401,10 @@ kbd {
   font-size: 1.02em;
   font-variant-numeric: tabular-nums;
   color: #fff;
-  transition: filter 0.15s, transform 0.08s, opacity 0.15s;
+  transition:
+    filter 0.15s,
+    transform 0.08s,
+    opacity 0.15s;
 }
 
 .act:hover:not(:disabled) {
@@ -1451,7 +1472,7 @@ kbd {
   font-size: 0.85em;
 }
 
-.preset[aria-pressed='true'] {
+.preset[aria-pressed="true"] {
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--accent);
@@ -1663,7 +1684,7 @@ kbd {
 
 .sheet-title {
   margin: 0;
-  font: 600 1.35em/1.2 var(--font-display);
+  font: 600 1.35em / 1.2 var(--font-display);
   text-wrap: balance;
 }
 
@@ -1686,7 +1707,7 @@ kbd {
 
 .result-line {
   margin: 0;
-  font: 600 1.15em/1.35 var(--font-display);
+  font: 600 1.15em / 1.35 var(--font-display);
 }
 
 .sheet-actions {
@@ -1804,7 +1825,7 @@ kbd {
   color: var(--ink-2);
 }
 
-input[type='checkbox'][role='switch'] {
+input[type="checkbox"][role="switch"] {
   appearance: none;
   flex: none;
   width: 42px;
@@ -1817,8 +1838,8 @@ input[type='checkbox'][role='switch'] {
   transition: background 0.15s;
 }
 
-input[type='checkbox'][role='switch']::after {
-  content: '';
+input[type="checkbox"][role="switch"]::after {
+  content: "";
   position: absolute;
   top: 2px;
   left: 2px;
@@ -1826,14 +1847,16 @@ input[type='checkbox'][role='switch']::after {
   height: 18px;
   border-radius: 50%;
   background: var(--ink-3);
-  transition: transform 0.15s, background 0.15s;
+  transition:
+    transform 0.15s,
+    background 0.15s;
 }
 
-input[type='checkbox'][role='switch']:checked {
+input[type="checkbox"][role="switch"]:checked {
   background: var(--accent);
 }
 
-input[type='checkbox'][role='switch']:checked::after {
+input[type="checkbox"][role="switch"]:checked::after {
   transform: translateX(18px);
   background: var(--accent-ink);
 }
@@ -1872,7 +1895,7 @@ input[type='checkbox'][role='switch']:checked::after {
   color: var(--ink-2);
 }
 
-.tab[aria-selected='true'] {
+.tab[aria-selected="true"] {
   color: var(--ink);
   border-bottom-color: var(--accent);
 }
@@ -1896,7 +1919,7 @@ input[type='checkbox'][role='switch']:checked::after {
 }
 
 .stat-value {
-  font: 700 1.3em/1.2 var(--font-ui);
+  font: 700 1.3em / 1.2 var(--font-ui);
   font-variant-numeric: tabular-nums;
 }
 
@@ -2029,7 +2052,7 @@ input[type='checkbox'][role='switch']:checked::after {
 
 .detail-head h3 {
   margin: 0;
-  font: 600 1.2em/1.2 var(--font-display);
+  font: 600 1.2em / 1.2 var(--font-display);
 }
 
 .street h4,
@@ -2070,7 +2093,7 @@ input[type='checkbox'][role='switch']:checked::after {
 /* Help */
 .help section h3 {
   margin: 0 0 6px;
-  font: 600 1.1em/1.3 var(--font-display);
+  font: 600 1.1em / 1.3 var(--font-display);
 }
 
 .help p {

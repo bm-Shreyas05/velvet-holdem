@@ -133,8 +133,12 @@ console.log(`\n1) Engine fuzz: ${HANDS.toLocaleString()} hands`);
   console.log(
     `   ${HANDS.toLocaleString()} hands, ${actions.toLocaleString()} actions in ${secs.toFixed(1)} s (${Math.round(HANDS / secs).toLocaleString()} hands/s incl. replay)`,
   );
-  console.log(`   showdowns ${showdowns.toLocaleString()} · hands with side pots ${sidePotHands.toLocaleString()} (up to ${maxPots} pots) · split pots ${splits.toLocaleString()}`);
-  console.log(`   all-in run-outs ${allInRunouts.toLocaleString()} · uncalled bets returned ${uncalled.toLocaleString()} · heap ${heapStart.toFixed(0)} → ${heapMb().toFixed(0)} MB`);
+  console.log(
+    `   showdowns ${showdowns.toLocaleString()} · hands with side pots ${sidePotHands.toLocaleString()} (up to ${maxPots} pots) · split pots ${splits.toLocaleString()}`,
+  );
+  console.log(
+    `   all-in run-outs ${allInRunouts.toLocaleString()} · uncalled bets returned ${uncalled.toLocaleString()} · heap ${heapStart.toFixed(0)} → ${heapMb().toFixed(0)} MB`,
+  );
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -49,13 +49,23 @@ function strengthOf(hand: HoldemHand, seat: number): number {
   return boardStrength(view.board)[comboIndex(cards[0]!, cards[1]!)]!;
 }
 
-function runSession(seed: string, seats: SeatSpec[], hands: number, onHand?: (h: number, nets: number[]) => void): { results: SeatResult[]; book: StatsBook; ids: string[] } {
+function runSession(
+  seed: string,
+  seats: SeatSpec[],
+  hands: number,
+  onHand?: (h: number, nets: number[]) => void,
+): { results: SeatResult[]; book: StatsBook; ids: string[] } {
   const rng = new SeededRng(seed);
   const book: StatsBook = {};
   const ids = seats.map((_, i) => `s${i}`);
   const results: SeatResult[] = seats.map((s) => ({ label: s.label, nets: [] }));
   for (let h = 0; h < hands; h++) {
-    const setup = { handNumber: h + 1, seats: ids.map((id) => ({ id, stack: STACK })), button: h % seats.length, blinds: { smallBlind: BB / 2, bigBlind: BB, ante: 0 } };
+    const setup = {
+      handNumber: h + 1,
+      seats: ids.map((id) => ({ id, stack: STACK })),
+      button: h % seats.length,
+      blinds: { smallBlind: BB / 2, bigBlind: BB, ante: 0 },
+    };
     const { hand } = HoldemHand.start(setup, Deck.shuffled(rng));
     let guard = 0;
     while (!hand.isComplete && guard++ < 300) {
@@ -78,7 +88,9 @@ function runSession(seed: string, seats: SeatSpec[], hands: number, onHand?: (h:
     }
     const r = hand.result!;
     const nets = r.netChange;
-    nets.forEach((n, i) => results[i]!.nets.push(n));
+    nets.forEach((n, i) => {
+      results[i]!.nets.push(n);
+    });
     observeHand(book, publicRecordFromView(hand.viewFor(null)));
     onHand?.(h, nets);
   }
@@ -115,12 +127,16 @@ function expect(ok: boolean, text: string): void {
 if (run('A')) {
   const hands = N(2500);
   console.log(`\nA. Exploitation — Elite Shark vs fixed styles, 4-handed, ${hands} hands`);
-  const { results } = runSession('eval-A', [
-    { label: 'Elite Shark', kind: 'ai', style: 'shark', difficulty: 'elite' },
-    { label: 'Calling station bot', kind: 'bot', style: 'station' },
-    { label: 'Maniac bot', kind: 'bot', style: 'maniac' },
-    { label: 'Random bot', kind: 'bot', style: 'random' },
-  ], hands);
+  const { results } = runSession(
+    'eval-A',
+    [
+      { label: 'Elite Shark', kind: 'ai', style: 'shark', difficulty: 'elite' },
+      { label: 'Calling station bot', kind: 'bot', style: 'station' },
+      { label: 'Maniac bot', kind: 'bot', style: 'maniac' },
+      { label: 'Random bot', kind: 'bot', style: 'random' },
+    ],
+    hands,
+  );
   for (const r of results) console.log(`   ${r.label.padEnd(22)} ${fmt(bb100(r.nets))}`);
   const shark = bb100(results[0]!.nets);
   expect(shark.mean - shark.ci > 0, 'the Shark wins significantly against exploitable players');
@@ -136,10 +152,14 @@ if (run('B')) {
     ['standard', 'casual'],
   ];
   for (const [hi, lo] of pairs) {
-    const { results } = runSession(`eval-B-${hi}-${lo}`, [
-      { label: hi, kind: 'ai', style: 'shark', difficulty: hi },
-      { label: lo, kind: 'ai', style: 'shark', difficulty: lo },
-    ], hands);
+    const { results } = runSession(
+      `eval-B-${hi}-${lo}`,
+      [
+        { label: hi, kind: 'ai', style: 'shark', difficulty: hi },
+        { label: lo, kind: 'ai', style: 'shark', difficulty: lo },
+      ],
+      hands,
+    );
     const r = bb100(results[0]!.nets);
     console.log(`   ${hi.padEnd(8)} vs ${lo.padEnd(8)} ${fmt(r)} for ${hi}`);
     expect(r.mean > 0, `${hi} beats ${lo}`);
@@ -151,7 +171,11 @@ if (run('C')) {
   const hands = N(2000);
   console.log(`\nC. Style fingerprints — five personalities at one table (Pro), ${hands} hands`);
   const styles: StyleId[] = ['rock', 'shark', 'trapper', 'maniac', 'station'];
-  const { results, book, ids } = runSession('eval-C', styles.map((s) => ({ label: STYLES[s].label, kind: 'ai' as const, style: s, difficulty: 'pro' as Difficulty })), hands);
+  const { results, book, ids } = runSession(
+    'eval-C',
+    styles.map((s) => ({ label: STYLES[s].label, kind: 'ai' as const, style: s, difficulty: 'pro' as Difficulty })),
+    hands,
+  );
   const opts = { tableSize: 5, recencyWeight: 0 };
   const rows = styles.map((s, i) => {
     const st = book[ids[i]!];
@@ -167,7 +191,9 @@ if (run('C')) {
   });
   console.log('   style          VPIP   PFR    AF    WTSD  fold-to-bet  result');
   for (const r of rows) {
-    console.log(`   ${r.label.padEnd(14)} ${pct(r.vpip).padStart(4)}  ${pct(r.pfr).padStart(4)}  ${r.af.toFixed(2).padStart(5)}  ${pct(r.wtsd).padStart(4)}   ${pct(r.foldToBet).padStart(4)}      ${fmt(r.result)}`);
+    console.log(
+      `   ${r.label.padEnd(14)} ${pct(r.vpip).padStart(4)}  ${pct(r.pfr).padStart(4)}  ${r.af.toFixed(2).padStart(5)}  ${pct(r.wtsd).padStart(4)}   ${pct(r.foldToBet).padStart(4)}      ${fmt(r.result)}`,
+    );
   }
   const by = Object.fromEntries(rows.map((r, i) => [styles[i]!, r]));
   expect(by.rock!.vpip < by.shark!.vpip && by.shark!.vpip < by.maniac!.vpip, 'Rock plays the fewest hands, Maniac the most');
@@ -186,7 +212,15 @@ if (run('D')) {
     const rng = new SeededRng(`eval-D-${bot}`);
     const book: StatsBook = {};
     for (let h = 0; h < hands; h++) {
-      const setup = { handNumber: h + 1, seats: [{ id: 'shark', stack: STACK }, { id: 'bot', stack: STACK }], button: h % 2, blinds: { smallBlind: BB / 2, bigBlind: BB, ante: 0 } };
+      const setup = {
+        handNumber: h + 1,
+        seats: [
+          { id: 'shark', stack: STACK },
+          { id: 'bot', stack: STACK },
+        ],
+        button: h % 2,
+        blinds: { smallBlind: BB / 2, bigBlind: BB, ante: 0 },
+      };
       const { hand } = HoldemHand.start(setup, Deck.shuffled(rng));
       // "Early" = the first 100 hands, before any read can be trusted; "late" = the second half.
       const phase = h < 100 ? counts.early : h >= hands * 0.5 ? counts.late : null;

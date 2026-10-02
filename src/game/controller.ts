@@ -446,7 +446,8 @@ export class GameController {
 
   #announceGameOver(): void {
     const winner = this.#table.winner()!;
-    const humanPlace = this.#session.humanFinish?.place ?? (winner.seat === this.#session.humanSeat ? 1 : this.#table.players()[this.#session.humanSeat]!.place ?? 0);
+    const humanPlace =
+      this.#session.humanFinish?.place ?? (winner.seat === this.#session.humanSeat ? 1 : (this.#table.players()[this.#session.humanSeat]!.place ?? 0));
     this.#save();
     this.#presenter.gameOver(
       {

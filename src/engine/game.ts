@@ -173,7 +173,7 @@ export class TableGame {
   }
 
   winner(): GamePlayerState | null {
-    return this.isOver ? this.players().find((p) => !p.eliminated) ?? null : null;
+    return this.isOver ? (this.players().find((p) => !p.eliminated) ?? null) : null;
   }
 
   levelIndexForHand(handNumber: number): number {
@@ -245,7 +245,7 @@ export class TableGame {
   /** Applies a completed hand: stacks, eliminations and finishing places. */
   settleHand(): HandSettlement {
     const hand = this.#hand;
-    if (!hand || !hand.isComplete) throw new Error('No completed hand to settle');
+    if (!hand?.isComplete) throw new Error('No completed hand to settle');
     if (this.#s.handSettled) throw new Error('Hand already settled');
     const result = hand.result!;
     const aliveBefore = this.#s.players.filter((p) => !p.eliminated).length;
@@ -308,7 +308,7 @@ export class TableGame {
   }
 
   static restore(data: GameStateData): TableGame {
-    if (!data || data.version !== 1 || !Array.isArray(data.players) || !data.config) throw new Error('Unrecognised game data');
+    if (data?.version !== 1 || !Array.isArray(data.players) || !data.config) throw new Error('Unrecognised game data');
     const problem = validateGameConfig(data.config);
     if (problem) throw new Error(`Saved game has an invalid configuration: ${problem}`);
     const copy = structuredClone(data);

@@ -15,7 +15,9 @@ interface InstallPromptEvent extends Event {
 
 let deferred: InstallPromptEvent | null = null;
 const listeners = new Set<() => void>();
-const notify = () => listeners.forEach((fn) => fn());
+const notify = () => {
+  for (const fn of listeners) fn();
+};
 
 function eligible(): boolean {
   if (!('serviceWorker' in navigator) || !document.querySelector('link[rel="manifest"]')) return false;

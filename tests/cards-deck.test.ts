@@ -73,7 +73,9 @@ test('shuffle is unbiased: each card lands in each position about equally often'
   const counts = Array.from({ length: 52 }, () => new Array(52).fill(0));
   for (let t = 0; t < trials; t++) {
     const d = shuffle(orderedDeck(), rng);
-    d.forEach((card, pos) => counts[card][pos]++);
+    d.forEach((card, pos) => {
+      counts[card][pos]++;
+    });
   }
   // Chi-square over the card-0 row and the position-0 column (51 degrees of freedom each).
   const expected = trials / 52;

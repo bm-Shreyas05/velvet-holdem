@@ -86,11 +86,7 @@ export function seedFromString(text: string): SeedState {
 }
 
 export function isSeedState(value: unknown): value is SeedState {
-  return (
-    Array.isArray(value) &&
-    value.length === 4 &&
-    value.every((v) => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < TWO_32)
-  );
+  return Array.isArray(value) && value.length === 4 && value.every((v) => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < TWO_32);
 }
 
 export class SeededRng implements Rng {

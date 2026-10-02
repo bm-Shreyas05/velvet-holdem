@@ -44,9 +44,19 @@ test('the animated table state always matches the engine after every batch of ev
     const rng = new SeededRng(seed);
     const presenter = new ModelPresenter((legal: LegalActions) => randomLegalAction(legal, rng));
     presenter.eliminationChoice = 'watch';
-    const session = createSession({ ...defaultSetup(), difficulty: 'casual', startingStack: 2500, structure: 'turbo', seed, opponents: defaultSetup().opponents.concat([{ name: 'Nora Quill', style: 'trapper' }, { name: 'Benny Tuck', style: 'station' }]) });
+    const session = createSession({
+      ...defaultSetup(),
+      difficulty: 'casual',
+      startingStack: 2500,
+      structure: 'turbo',
+      seed,
+      opponents: defaultSetup().opponents.concat([
+        { name: 'Nora Quill', style: 'trapper' },
+        { name: 'Benny Tuck', style: 'station' },
+      ]),
+    });
     await new GameController(session, presenter, new InlineAiHost()).run();
-    assert.ok(presenter.batches > 40, `only ${presenter.batches} batches; mismatches: ${presenter.mismatches.slice(0, 3).join(" | ")}`);
+    assert.ok(presenter.batches > 40, `only ${presenter.batches} batches; mismatches: ${presenter.mismatches.slice(0, 3).join(' | ')}`);
     assert.deepEqual(presenter.mismatches, []);
     assert.deepEqual(presenter.violations, []);
   }
@@ -64,7 +74,10 @@ test('controls: labels, availability and presets follow the legal actions', () =
   assert.equal(c.aggressive!.max, 1000);
   assert.ok(c.potOdds && Math.abs(c.potOdds.equityNeeded - 50 / 125) < 1e-9);
   const p = presets(legal);
-  assert.deepEqual(p.map((x) => x.id), ['min', 'half', 'three-quarters', 'pot', 'allin']);
+  assert.deepEqual(
+    p.map((x) => x.id),
+    ['min', 'half', 'three-quarters', 'pot', 'allin'],
+  );
   assert.ok(p.every((x) => x.to >= 100 && x.to <= 1000));
   assert.equal(p.find((x) => x.id === 'pot')!.to, 50 + 125); // call 50, then raise the 125 pot
   assert.equal(aggressiveLabel('raise', 1000, 1000), 'All-in 1,000');
@@ -122,7 +135,12 @@ test('layout: content bounds cover every seat, and the scale fits them in the bo
         // The widest possible name plate (190 units, whatever the font) must fit.
         assert.ok(seat.anchor.x - 95 >= b.left && seat.anchor.x + 95 <= b.right, `${orientation} ${n}: seat plate inside horizontally`);
       }
-      for (const [w, h] of [[390, 402], [960, 560], [1400, 500], [300, 900]]) {
+      for (const [w, h] of [
+        [390, 402],
+        [960, 560],
+        [1400, 500],
+        [300, 900],
+      ]) {
         const s = fitScale(layout, w!, h!);
         assert.ok((b.right - b.left) * s <= w! + 1e-9 && (b.bottom - b.top) * s <= h! + 1e-9, `${orientation} ${n}: fits ${w}x${h}`);
       }

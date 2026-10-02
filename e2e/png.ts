@@ -16,7 +16,8 @@ export function decodePng(buf: Buffer): { width: number; height: number; channel
       width = body.readUInt32BE(0);
       height = body.readUInt32BE(4);
       const [depth, color, , , interlace] = [body[8], body[9], body[10], body[11], body[12]];
-      if (depth !== 8 || interlace !== 0 || (color !== 2 && color !== 6)) throw new Error(`unsupported PNG (depth ${depth}, colour ${color}, interlace ${interlace})`);
+      if (depth !== 8 || interlace !== 0 || (color !== 2 && color !== 6))
+        throw new Error(`unsupported PNG (depth ${depth}, colour ${color}, interlace ${interlace})`);
       channels = color === 6 ? 4 : 3;
     } else if (type === 'IDAT') idat.push(body);
     else if (type === 'IEND') break;

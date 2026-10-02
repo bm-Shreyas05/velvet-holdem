@@ -36,12 +36,7 @@ export interface HandHistoryRecord {
   replay: HandReplayData;
 }
 
-export function buildHistoryRecord(
-  hand: HoldemHand,
-  setup: HandSetup,
-  names: Record<number, string>,
-  humanSeat: number,
-): HandHistoryRecord {
+export function buildHistoryRecord(hand: HoldemHand, setup: HandSetup, names: Record<number, string>, humanSeat: number): HandHistoryRecord {
   const view = hand.viewFor(humanSeat);
   const result = view.result;
   if (!result) throw new Error('Cannot record an unfinished hand');

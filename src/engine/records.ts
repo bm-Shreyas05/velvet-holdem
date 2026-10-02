@@ -27,9 +27,7 @@ export function publicRecordFromView(view: HandView): PublicHandRecord {
     button: view.button,
     smallBlindSeat: view.smallBlindSeat,
     bigBlindSeat: view.bigBlindSeat,
-    players: view.seats
-      .filter((s) => s.inHand && s.id !== null)
-      .map((s) => ({ seat: s.seat, id: s.id!, startStack: s.startStack, endStack: s.stack })),
+    players: view.seats.filter((s) => s.inHand && s.id !== null).map((s) => ({ seat: s.seat, id: s.id!, startStack: s.startStack, endStack: s.stack })),
     actions: view.actions.map((a) => ({ ...a })),
     board: [...view.board],
     revealed: view.revealed.map((r) => ({ seat: r.seat, cards: [...r.cards] })),
@@ -59,13 +57,7 @@ export function decisionsFromLog(actions: readonly ActionLogEntry[]): { seat: nu
 }
 
 /** Name of a seat's position for display ("BTN", "SB", "BB", "UTG", "HJ", "CO"…). */
-export function positionLabel(
-  seat: number,
-  button: number,
-  smallBlindSeat: number | null,
-  bigBlindSeat: number,
-  dealtIn: readonly number[],
-): string {
+export function positionLabel(seat: number, button: number, smallBlindSeat: number | null, bigBlindSeat: number, dealtIn: readonly number[]): string {
   const n = dealtIn.length;
   if (n === 2) return seat === button ? 'BTN/SB' : 'BB';
   if (seat === button) return 'BTN';

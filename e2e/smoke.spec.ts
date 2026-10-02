@@ -56,11 +56,16 @@ test('your own cards are rendered face up and every seat is on screen', async ({
   const area = (await page.locator('.table-area').boundingBox())!;
   for (const plate of await page.locator('.seat-plate').all()) {
     const b = (await plate.boundingBox())!;
-    expect(b.x >= area.x - 1 && b.x + b.width <= area.x + area.width + 1 && b.y >= area.y - 1 && b.y + b.height <= area.y + area.height + 1, `seat plate ${JSON.stringify(b)} inside ${JSON.stringify(area)}`).toBe(true);
+    expect(
+      b.x >= area.x - 1 && b.x + b.width <= area.x + area.width + 1 && b.y >= area.y - 1 && b.y + b.height <= area.y + area.height + 1,
+      `seat plate ${JSON.stringify(b)} inside ${JSON.stringify(area)}`,
+    ).toBe(true);
   }
   const hero = page.locator('.card--hero');
   await expect(hero).toHaveCount(2);
-  await expect.poll(() => hero.evaluateAll((els) => els.flatMap((e) => e.getAnimations({ subtree: true })).filter((a) => a.playState === 'running').length)).toBe(0);
+  await expect
+    .poll(() => hero.evaluateAll((els) => els.flatMap((e) => e.getAnimations({ subtree: true })).filter((a) => a.playState === 'running').length))
+    .toBe(0);
   for (const card of await hero.all()) {
     await expect(card).toHaveAttribute('data-up', 'true');
     // Faces are near-white and backs dark red, so this catches an engine painting the back over

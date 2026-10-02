@@ -46,12 +46,18 @@ test('folded contributors fund pots but are never eligible', () => {
       [750, [2, 3]],
     ],
   );
-  assert.equal(pots.reduce((s, p) => s + p.amount, 0), 1150);
+  assert.equal(
+    pots.reduce((s, p) => s + p.amount, 0),
+    1150,
+  );
 });
 
 test('folded chips above every live contribution are still awarded', () => {
   const pots = buildPots([c(0, 300, true), c(1, 200)]);
-  assert.equal(pots.reduce((s, p) => s + p.amount, 0), 500);
+  assert.equal(
+    pots.reduce((s, p) => s + p.amount, 0),
+    500,
+  );
   assert.deepEqual(pots[pots.length - 1]!.eligible, [1]);
 });
 
@@ -78,17 +84,30 @@ test('randomised: pots always sum to contributions and nest correctly', () => {
     if (contribs.every((x) => x.folded || x.amount === 0)) contribs[0] = c(0, 100);
     const pots = buildPots(contribs);
     const total = contribs.reduce((s, x) => s + x.amount, 0);
-    assert.equal(pots.reduce((s, p) => s + p.amount, 0), total);
+    assert.equal(
+      pots.reduce((s, p) => s + p.amount, 0),
+      total,
+    );
     for (let i = 1; i < pots.length; i++) {
       for (const seat of pots[i]!.eligible) assert.ok(pots[i - 1]!.eligible.includes(seat), 'side pot eligibility must nest');
     }
     for (const p of pots) {
       assert.ok(p.eligible.every((seat) => !contribs[seat]!.folded));
-      assert.equal(Object.values(p.contributions).reduce((a, b) => a + b, 0), p.amount);
+      assert.equal(
+        Object.values(p.contributions).reduce((a, b) => a + b, 0),
+        p.amount,
+      );
       const winners = p.eligible.filter(() => randomInt(rng, 2) === 0);
       const w = winners.length ? winners : [p.eligible[0]!];
-      const shares = splitPot(p.amount, w, contribs.map((x) => x.seat));
-      assert.equal(shares.reduce((s, x) => s + x.amount, 0), p.amount);
+      const shares = splitPot(
+        p.amount,
+        w,
+        contribs.map((x) => x.seat),
+      );
+      assert.equal(
+        shares.reduce((s, x) => s + x.amount, 0),
+        p.amount,
+      );
       assert.ok(Math.max(...shares.map((x) => x.amount)) - Math.min(...shares.map((x) => x.amount)) <= 1);
     }
   }

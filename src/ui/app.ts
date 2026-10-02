@@ -2,7 +2,7 @@ import { AudioEngine } from '../audio/audio.ts';
 import { ICONS } from '../assets/icons.ts';
 import { type AiHost, InlineAiHost, WorkerAiHost } from '../ai/host.ts';
 import { DIFFICULTIES } from '../ai/profiles.ts';
-import { type NewGameSetup } from '../game/config.ts';
+import type { NewGameSetup } from '../game/config.ts';
 import { GameController, type GameOverInfo, type TableSnapshot } from '../game/controller.ts';
 import type { HandHistoryRecord } from '../game/history.ts';
 import { createSession, type SessionData } from '../game/session.ts';
@@ -124,7 +124,12 @@ export class App {
       const existing = this.storage.session.load();
       const inProgress = existing.status === 'ok' && existing.payload.table.players.filter((p) => !p.eliminated).length > 1;
       if (inProgress) {
-        const ok = await confirm('Start a new game?', 'Your game in progress will be replaced. Its hands still count toward your lifetime statistics.', 'Start new game', true);
+        const ok = await confirm(
+          'Start a new game?',
+          'Your game in progress will be replaced. Its hands still count toward your lifetime statistics.',
+          'Start new game',
+          true,
+        );
         if (!ok) return;
       }
     }
@@ -284,7 +289,12 @@ export class App {
         : `Level ${snap.level}`;
     const alive = snap.seats.filter((s) => !s.eliminated).length;
     header.append(
-      h('div', { class: 'brand' }, h('span', { class: 'brand-mark' }, 'Velvet'), h('span', { class: 'brand-sub' }, DIFFICULTIES[this.#table?.controller?.session.setup.difficulty ?? 'standard']?.label ?? '')),
+      h(
+        'div',
+        { class: 'brand' },
+        h('span', { class: 'brand-mark' }, 'Velvet'),
+        h('span', { class: 'brand-sub' }, DIFFICULTIES[this.#table?.controller?.session.setup.difficulty ?? 'standard']?.label ?? ''),
+      ),
       h(
         'div',
         { class: 'hand-info' },

@@ -82,7 +82,9 @@ export function createSession(setup: NewGameSetup): SessionData {
   const tableData = table.serialize();
   let devDecks: Record<number, number[]> | undefined;
   if (scenario) {
-    scenario.stacks.forEach((stack, i) => (tableData.players[i]!.stack = stack));
+    scenario.stacks.forEach((stack, i) => {
+      tableData.players[i]!.stack = stack;
+    });
     tableData.totalChips = scenario.stacks.reduce((a, b) => a + b, 0);
     devDecks = { 1: preparedDeck(seats.length, scenario.button, scenario.holes, scenario.board) };
   }
@@ -91,7 +93,9 @@ export function createSession(setup: NewGameSetup): SessionData {
 
   return {
     version: SESSION_VERSION,
-    gameId: nextSeed(master).map((x) => x.toString(36)).join(''),
+    gameId: nextSeed(master)
+      .map((x) => x.toString(36))
+      .join(''),
     startedAt: new Date().toISOString(),
     setup: structuredClone(setup),
     seats,

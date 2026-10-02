@@ -120,7 +120,11 @@ export class TableView {
         style: `left:${t.cx - t.rx}px;top:${t.cy - t.ry}px;width:${t.rx * 2}px;height:${t.ry * 2}px`,
         'aria-hidden': 'true',
       },
-      h('div', { class: 'table-felt' }, h('div', { class: 'felt-mark' }, h('span', { class: 'felt-title' }, 'Velvet'), h('span', { class: 'felt-sub' }, "No-Limit Hold'em"))),
+      h(
+        'div',
+        { class: 'table-felt' },
+        h('div', { class: 'felt-mark' }, h('span', { class: 'felt-title' }, 'Velvet'), h('span', { class: 'felt-sub' }, "No-Limit Hold'em")),
+      ),
     );
     this.#stage.append(this.#felt);
 
@@ -137,7 +141,14 @@ export class TableView {
     this.#potAmount = h('div', { class: 'pot-amount' });
     this.#potTotal = h('div', { class: 'pot-total' });
     this.#sidePots = h('div', { class: 'side-pots' });
-    this.#pot = h('div', { class: 'pot', style: this.#pos(L.pot), role: 'status', 'aria-live': 'off' }, this.#potChips, this.#potAmount, this.#potTotal, this.#sidePots);
+    this.#pot = h(
+      'div',
+      { class: 'pot', style: this.#pos(L.pot), role: 'status', 'aria-live': 'off' },
+      this.#potChips,
+      this.#potAmount,
+      this.#potTotal,
+      this.#sidePots,
+    );
     this.#stage.append(this.#pot);
 
     this.#bets = [];
@@ -162,13 +173,7 @@ export class TableView {
         blind: h('div', { class: 'blind-chip' }),
         avatar: h('div', { class: 'avatar' }),
       };
-      const plate = h(
-        'div',
-        { class: 'seat-plate' },
-        els.avatar,
-        h('div', { class: 'seat-info' }, els.name, els.stack),
-        els.blind,
-      );
+      const plate = h('div', { class: 'seat-plate' }, els.avatar, h('div', { class: 'seat-info' }, els.name, els.stack), els.blind);
       els.root.append(els.cards, plate, els.status, els.badge, els.hand);
       this.#seats.push(els);
       this.#stage.append(els.root);
@@ -195,8 +200,23 @@ export class TableView {
     const s = this.#settings().display;
     const el = h(
       'div',
-      { class: `card card--${size}`, 'data-up': faceUp && card !== null ? 'true' : 'false', role: 'img', 'aria-label': card === null || !faceUp ? 'Face-down card' : cardName(card) },
-      h('div', { class: 'card-inner' }, h('img', { class: 'card-face', alt: '', draggable: 'false', src: card === null ? cardBackUrl(s.cardBack) : cardFaceUrl(card, { fourColor: s.fourColorDeck }) }), h('img', { class: 'card-back', alt: '', draggable: 'false', src: cardBackUrl(s.cardBack) })),
+      {
+        class: `card card--${size}`,
+        'data-up': faceUp && card !== null ? 'true' : 'false',
+        role: 'img',
+        'aria-label': card === null || !faceUp ? 'Face-down card' : cardName(card),
+      },
+      h(
+        'div',
+        { class: 'card-inner' },
+        h('img', {
+          class: 'card-face',
+          alt: '',
+          draggable: 'false',
+          src: card === null ? cardBackUrl(s.cardBack) : cardFaceUrl(card, { fourColor: s.fourColorDeck }),
+        }),
+        h('img', { class: 'card-back', alt: '', draggable: 'false', src: cardBackUrl(s.cardBack) }),
+      ),
     );
     if (card !== null) el.dataset.card = String(card);
     return el;
@@ -233,8 +253,12 @@ export class TableView {
     if (sidePots.length > 1) for (const p of sidePots) this.#sidePots.append(h('span', { class: 'side-pot' }, `${p.label} ${chips(p.amount)}`));
 
     // Seats and bets
-    d.seats.forEach((s, i) => this.#renderSeat(i, s, d));
-    this.#bets.forEach((bet, i) => this.#renderBet(bet, d.seats[i]!.bet));
+    d.seats.forEach((s, i) => {
+      this.#renderSeat(i, s, d);
+    });
+    this.#bets.forEach((bet, i) => {
+      this.#renderBet(bet, d.seats[i]!.bet);
+    });
 
     // Dealer button
     const g = this.#layout.seats[d.button];
@@ -318,7 +342,9 @@ export class TableView {
   // State indicators
 
   setActive(seat: number | null): void {
-    this.#seats.forEach((e, i) => e.root.classList.toggle('is-turn', i === seat));
+    this.#seats.forEach((e, i) => {
+      e.root.classList.toggle('is-turn', i === seat);
+    });
   }
 
   setThinking(seat: number | null): void {
@@ -371,7 +397,14 @@ export class TableView {
     markup.style.left = `${from.x}px`;
     markup.style.top = `${from.y}px`;
     this.#fx.append(markup);
-    await this.#motion.run(markup, [{ transform: 'translate(-50%, -50%) scale(1)', opacity: 1 }, { transform: `translate(calc(-50% + ${to.x - from.x}px), calc(-50% + ${to.y - from.y}px)) scale(1)`, opacity: 1, ...extra }], ms);
+    await this.#motion.run(
+      markup,
+      [
+        { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
+        { transform: `translate(calc(-50% + ${to.x - from.x}px), calc(-50% + ${to.y - from.y}px)) scale(1)`, opacity: 1, ...extra },
+      ],
+      ms,
+    );
     markup.remove();
   }
 
@@ -393,7 +426,9 @@ export class TableView {
         flights.push(
           this.#motion.wait(wait).then(() => {
             onCard();
-            return this.#fly(card, deck, { x: target.x + (pass ? 10 : -10), y: target.y }, 260, { transform: `translate(calc(-50% + ${target.x + (pass ? 10 : -10) - deck.x}px), calc(-50% + ${target.y - deck.y}px)) rotate(${pass ? 4 : -4}deg)` });
+            return this.#fly(card, deck, { x: target.x + (pass ? 10 : -10), y: target.y }, 260, {
+              transform: `translate(calc(-50% + ${target.x + (pass ? 10 : -10) - deck.x}px), calc(-50% + ${target.y - deck.y}px)) rotate(${pass ? 4 : -4}deg)`,
+            });
           }),
         );
         delay += 70;
@@ -421,7 +456,12 @@ export class TableView {
     const back = card.querySelector<HTMLElement>('.card-back');
     if (!inner || !face || !back) return;
     const timing = { delay, easing: 'linear' };
-    const swap = (from: string, to: string): Keyframe[] => [{ visibility: from }, { visibility: from, offset: 0.5 }, { visibility: to, offset: 0.5 }, { visibility: to }];
+    const swap = (from: string, to: string): Keyframe[] => [
+      { visibility: from },
+      { visibility: from, offset: 0.5 },
+      { visibility: to, offset: 0.5 },
+      { visibility: to },
+    ];
     await Promise.all([
       this.#motion.run(
         inner,
@@ -482,7 +522,14 @@ export class TableView {
       const el = this.#cardEl(cards[k]!, 'board', true);
       slot.append(el);
       onCard();
-      await this.#motion.run(el, [{ transform: 'translateY(-16px) scale(.92)', opacity: 0 }, { transform: 'none', opacity: 1 }], 200);
+      await this.#motion.run(
+        el,
+        [
+          { transform: 'translateY(-16px) scale(.92)', opacity: 0 },
+          { transform: 'none', opacity: 1 },
+        ],
+        200,
+      );
       await this.#flip(el, 320);
     }
   }
@@ -494,7 +541,14 @@ export class TableView {
     const from = this.#pointOf(this.#seats[seat]!.cards);
     await Promise.all(
       cards.map((c) =>
-        this.#motion.run(c, [{ transform: 'none', opacity: 1 }, { transform: `translate(${(toward.x - from.x) * 0.35}px, ${(toward.y - from.y) * 0.35}px) rotate(12deg) scale(.8)`, opacity: 0 }], 300),
+        this.#motion.run(
+          c,
+          [
+            { transform: 'none', opacity: 1 },
+            { transform: `translate(${(toward.x - from.x) * 0.35}px, ${(toward.y - from.y) * 0.35}px) rotate(12deg) scale(.8)`, opacity: 0 },
+          ],
+          300,
+        ),
       ),
     );
   }
@@ -506,7 +560,14 @@ export class TableView {
 
   popBadge(seat: number): void {
     const el = this.#seats[seat]!.badge;
-    void this.#motion.run(el, [{ transform: 'translate(-50%, 0) scale(.6)', opacity: 0 }, { transform: 'translate(-50%, 0) scale(1)', opacity: 1 }], 220);
+    void this.#motion.run(
+      el,
+      [
+        { transform: 'translate(-50%, 0) scale(.6)', opacity: 0 },
+        { transform: 'translate(-50%, 0) scale(1)', opacity: 1 },
+      ],
+      220,
+    );
   }
 
   /** Brief visual pulse when a player goes out. */
@@ -520,8 +581,8 @@ export class TableView {
 
   /** Re-applies card artwork after a display setting changes. */
   refreshArt(): void {
-    this.#seats.forEach((s) => delete s.cards.dataset.cards);
-    this.#board.forEach((slot) => clear(slot));
+    for (const s of this.#seats) delete s.cards.dataset.cards;
+    for (const slot of this.#board) clear(slot);
     if (this.#display) this.render(this.#display, this.#sidePotInfo);
   }
 

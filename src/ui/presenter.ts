@@ -78,7 +78,7 @@ export class DomPresenter implements Presenter {
   }
 
   #name(seat: number): string {
-    return seat === this.#humanSeat ? 'You' : this.#names[seat] ?? `Seat ${seat + 1}`;
+    return seat === this.#humanSeat ? 'You' : (this.#names[seat] ?? `Seat ${seat + 1}`);
   }
 
   #render(): void {
@@ -189,7 +189,12 @@ export class DomPresenter implements Presenter {
           this.#render();
           const title = e.street === 'flop' ? 'Flop' : e.street === 'turn' ? 'Turn' : 'River';
           log.entry(`${title}`, 'street', e.cards);
-          announcer.say(`${title}: ${e.board.map((c) => `${RANK_NAMES[rankOf(c)]} of ${['clubs', 'diamonds', 'hearts', 'spades'][suitOf(c)]}`).slice(from).join(', ')}.`);
+          announcer.say(
+            `${title}: ${e.board
+              .map((c) => `${RANK_NAMES[rankOf(c)]} of ${['clubs', 'diamonds', 'hearts', 'spades'][suitOf(c)]}`)
+              .slice(from)
+              .join(', ')}.`,
+          );
           this.#updateStrengthFrom(next);
           await motion.wait(280);
           break;

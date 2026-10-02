@@ -23,9 +23,11 @@ interface SheetOptions {
 const stack: { el: HTMLElement; opts: SheetOptions; restore: Element | null; close: () => void }[] = [];
 
 function focusables(root: HTMLElement): HTMLElement[] {
-  return [...root.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea, [tabindex]:not([tabindex="-1"])')].filter(
-    (el) => !el.hidden && el.offsetParent !== null,
-  );
+  return [
+    ...root.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea, [tabindex]:not([tabindex="-1"])',
+    ),
+  ].filter((el) => !el.hidden && el.offsetParent !== null);
 }
 
 document.addEventListener(
@@ -62,7 +64,12 @@ export function openSheet(opts: SheetOptions, ...content: (Node | string)[]): Sh
   const titleId = `sheet-title-${Math.random().toString(36).slice(2, 8)}`;
   const body = h('div', { class: 'sheet-body' }, ...content);
   const header = h('header', { class: 'sheet-head' }, h('h2', { id: titleId, class: 'sheet-title' }, opts.title));
-  const panel = h('div', { class: `sheet ${opts.wide ? 'sheet--wide' : ''} ${opts.className ?? ''}`, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': titleId }, header, body);
+  const panel = h(
+    'div',
+    { class: `sheet ${opts.wide ? 'sheet--wide' : ''} ${opts.className ?? ''}`, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': titleId },
+    header,
+    body,
+  );
   const backdrop = h('div', { class: 'sheet-backdrop' }, panel);
   const restore = document.activeElement;
   let closed = false;
@@ -100,7 +107,12 @@ export interface Choice<T extends string> {
   danger?: boolean;
 }
 
-export function choose<T extends string>(title: string, message: string | Node, choices: Choice<T>[], opts: { modal?: boolean; cancelId?: T } = {}): Promise<T> {
+export function choose<T extends string>(
+  title: string,
+  message: string | Node,
+  choices: Choice<T>[],
+  opts: { modal?: boolean; cancelId?: T } = {},
+): Promise<T> {
   return new Promise((resolve) => {
     let answered = false;
     const buttons = h(
@@ -131,10 +143,15 @@ export function choose<T extends string>(title: string, message: string | Node, 
 }
 
 export async function confirm(title: string, message: string, confirmLabel: string, danger = false): Promise<boolean> {
-  const answer = await choose(title, message, [
-    { id: 'cancel', label: 'Cancel' },
-    { id: 'ok', label: confirmLabel, primary: !danger, danger },
-  ], { cancelId: 'cancel' });
+  const answer = await choose(
+    title,
+    message,
+    [
+      { id: 'cancel', label: 'Cancel' },
+      { id: 'ok', label: confirmLabel, primary: !danger, danger },
+    ],
+    { cancelId: 'cancel' },
+  );
   return answer === 'ok';
 }
 
@@ -147,10 +164,13 @@ export function toast(message: string, tone: 'info' | 'warning' | 'error' = 'inf
   }
   const el = h('div', { class: `toast toast--${tone}` }, message);
   toastHost.append(el);
-  setTimeout(() => {
-    el.classList.add('is-leaving');
-    setTimeout(() => el.remove(), 250);
-  }, tone === 'error' ? ms * 2 : ms);
+  setTimeout(
+    () => {
+      el.classList.add('is-leaving');
+      setTimeout(() => el.remove(), 250);
+    },
+    tone === 'error' ? ms * 2 : ms,
+  );
 }
 
 /** Screen-reader announcements (visually hidden live regions). */

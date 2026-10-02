@@ -15,7 +15,10 @@ function quickSetup(seed: string, extra: Partial<NewGameSetup> = {}): NewGameSet
 }
 
 /** A deterministic "human": calls or checks, raises with some hands, folds sometimes — keyed on public state. */
-const scriptedHuman = (legal: Parameters<ConstructorParameters<typeof HeadlessPresenter>[0]>[0], snapshot: Parameters<ConstructorParameters<typeof HeadlessPresenter>[0]>[1]): PlayerAction => {
+const scriptedHuman = (
+  legal: Parameters<ConstructorParameters<typeof HeadlessPresenter>[0]>[0],
+  snapshot: Parameters<ConstructorParameters<typeof HeadlessPresenter>[0]>[1],
+): PlayerAction => {
   const key = (snapshot.handNumber * 31 + (snapshot.view?.actions.length ?? 0) * 7) % 10;
   if (legal.aggression && key < 2) return { kind: legal.aggression, to: legal.minTo };
   if (legal.canFold && key >= 8) return { kind: 'fold' };
@@ -37,7 +40,10 @@ test('a complete game runs to a single winner holding every chip', async () => {
   assert.ok(info, 'game over was announced');
   const final = controller.session;
   const stacks = final.table.players.map((p) => p.stack);
-  assert.equal(stacks.reduce((a, b) => a + b, 0), 600 * 4);
+  assert.equal(
+    stacks.reduce((a, b) => a + b, 0),
+    600 * 4,
+  );
   assert.equal(stacks.filter((s) => s > 0).length, 1);
   assert.equal(final.table.players[info!.winnerSeat]!.stack, 2400);
   assert.equal(records.length, info!.hands);
@@ -48,7 +54,16 @@ test('a complete game runs to a single winner holding every chip', async () => {
   // Every recorded hand replays exactly from its stored deck and decisions.
   for (const r of records) {
     const replay = replayHand(r.replay);
-    assert.deepEqual(replay.result!.finalStacks, r.players.reduce((acc, p) => ((acc[p.seat] = p.endStack), acc), [...replay.result!.finalStacks]));
+    assert.deepEqual(
+      replay.result!.finalStacks,
+      r.players.reduce(
+        (acc, p) => {
+          acc[p.seat] = p.endStack;
+          return acc;
+        },
+        [...replay.result!.finalStacks],
+      ),
+    );
   }
 });
 
@@ -87,7 +102,12 @@ test('saving mid-game and resuming produces exactly the same game (seeded)', asy
   for (let i = 0; i < records.length; i++) {
     assert.deepEqual(records[i]!.replay, reference.records[i]!.replay, `hand ${i + 1} differs after resume`);
   }
-  assert.equal(p2.gameOverInfo?.winnerSeat, (await playToEnd(createSession(quickSetup('resume-determinism')), new HeadlessPresenter(scriptedHuman))).controller.session.table.players.findIndex((p) => p.place === 1));
+  assert.equal(
+    p2.gameOverInfo?.winnerSeat,
+    (await playToEnd(createSession(quickSetup('resume-determinism')), new HeadlessPresenter(scriptedHuman))).controller.session.table.players.findIndex(
+      (p) => p.place === 1,
+    ),
+  );
 });
 
 test('resuming in the middle of a hand continues that exact hand', async () => {

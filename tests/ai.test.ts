@@ -6,7 +6,7 @@ import { cardsToString, parseCards } from '../src/engine/cards.ts';
 import { Deck } from '../src/engine/deck.ts';
 import { HoldemHand } from '../src/engine/hand.ts';
 import { SeededRng } from '../src/engine/rng.ts';
-import type { ActionKind, HandView } from '../src/engine/types.ts';
+import type { ActionKind, HandView, PlayerAction } from '../src/engine/types.ts';
 import { decide } from '../src/ai/decide.ts';
 import { sanitizeDecision } from '../src/ai/host.ts';
 import { type StatsBook, emptyStats, estimate, observeHand, tendencies } from '../src/ai/model.ts';
@@ -136,13 +136,18 @@ test('folds trash, raises premiums, and folds weak hands to heavy action', () =>
 
 test('calling becomes less frequent as the price rises (pot odds)', () => {
   const freq = (bet: number) => {
-    const hand = spot({ 2: 'Jc Td', 1: 'Qh 3h' }, 'Js 7h 2c', [
-      [3, 'fold'],
-      [0, 'fold'],
-      [1, 'call'],
-      [2, 'check'],
-      [1, 'bet', bet],
-    ], [1000, 1000, 2000, 1000]);
+    const hand = spot(
+      { 2: 'Jc Td', 1: 'Qh 3h' },
+      'Js 7h 2c',
+      [
+        [3, 'fold'],
+        [0, 'fold'],
+        [1, 'call'],
+        [2, 'check'],
+        [1, 'bet', bet],
+      ],
+      [1000, 1000, 2000, 1000],
+    );
     let calls = 0;
     for (let i = 0; i < 40; i++) {
       const d = decide({ view: hand.viewFor(2), style: 'shark', difficulty: 'pro', stats: {}, tilt: 0, seed: seed(i) });
@@ -160,17 +165,33 @@ function bookFor(id: string, style: 'folder' | 'station', hands: number): StatsB
   const book: StatsBook = {};
   const rng = new SeededRng(`book-${style}`);
   for (let i = 0; i < hands; i++) {
-    const { hand } = HoldemHand.start({ handNumber: i + 1, seats: [{ id, stack: 1000 }, { id: 'hero', stack: 1000 }], button: i % 2, blinds: BLINDS }, Deck.shuffled(rng));
+    const { hand } = HoldemHand.start(
+      {
+        handNumber: i + 1,
+        seats: [
+          { id, stack: 1000 },
+          { id: 'hero', stack: 1000 },
+        ],
+        button: i % 2,
+        blinds: BLINDS,
+      },
+      Deck.shuffled(rng),
+    );
     let guard = 0;
     while (!hand.isComplete && guard++ < 50) {
       const seat = hand.toAct!;
       const legal = hand.legalActions()!;
-      let action;
+      let action: PlayerAction;
       if (hand.seatId(seat) === id) {
         if (style === 'folder') action = legal.canCheck ? { kind: 'check' as const } : { kind: 'fold' as const };
         else action = legal.canCall ? { kind: 'call' as const } : { kind: 'check' as const };
       } else {
-        action = legal.aggression && hand.viewFor(null).street !== 'preflop' ? { kind: legal.aggression, to: legal.minTo } : legal.canCall ? { kind: 'call' as const } : { kind: 'check' as const };
+        action =
+          legal.aggression && hand.viewFor(null).street !== 'preflop'
+            ? { kind: legal.aggression, to: legal.minTo }
+            : legal.canCall
+              ? { kind: 'call' as const }
+              : { kind: 'check' as const };
       }
       hand.act(seat, action);
     }

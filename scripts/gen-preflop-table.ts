@@ -82,5 +82,17 @@ const out = fileURLToPath(new URL('../src/ai/preflop-table.ts', import.meta.url)
 writeFileSync(out, lines.join('\n'));
 const top = hu.map((e, i) => [className(i), e] as const).sort((a, b) => b[1] - a[1]);
 console.log(`wrote ${out}`);
-console.log('strongest:', top.slice(0, 6).map(([n, e]) => `${n} ${e}`).join(', '));
-console.log('weakest:', top.slice(-4).map(([n, e]) => `${n} ${e}`).join(', '));
+console.log(
+  'strongest:',
+  top
+    .slice(0, 6)
+    .map(([n, e]) => `${n} ${e}`)
+    .join(', '),
+);
+console.log(
+  'weakest:',
+  top
+    .slice(-4)
+    .map(([n, e]) => `${n} ${e}`)
+    .join(', '),
+);
