@@ -22,6 +22,12 @@ interface SheetOptions {
 
 const stack: { el: HTMLElement; opts: SheetOptions; restore: Element | null; close: () => void }[] = [];
 
+/** While any sheet is open, the page behind it is inert: unreachable by Tab and screen readers. */
+function syncInert(): void {
+  const app = document.getElementById('app');
+  if (app) app.inert = stack.length > 0;
+}
+
 function focusables(root: HTMLElement): HTMLElement[] {
   return [
     ...root.querySelectorAll<HTMLElement>(
@@ -62,7 +68,8 @@ export function dialogOpen(): boolean {
 
 export function openSheet(opts: SheetOptions, ...content: (Node | string)[]): SheetHandle {
   const titleId = `sheet-title-${Math.random().toString(36).slice(2, 8)}`;
-  const body = h('div', { class: 'sheet-body' }, ...content);
+  // Focusable so keyboard users can scroll long sheets that contain nothing else to focus.
+  const body = h('div', { class: 'sheet-body', tabindex: '0' }, ...content);
   const header = h('header', { class: 'sheet-head' }, h('h2', { id: titleId, class: 'sheet-title' }, opts.title));
   const panel = h(
     'div',
@@ -78,6 +85,7 @@ export function openSheet(opts: SheetOptions, ...content: (Node | string)[]): Sh
     closed = true;
     const i = stack.findIndex((s) => s.el === panel);
     if (i >= 0) stack.splice(i, 1);
+    syncInert();
     backdrop.classList.add('is-leaving');
     setTimeout(() => backdrop.remove(), 160);
     if (restore instanceof HTMLElement && document.contains(restore)) restore.focus({ preventScroll: true });
@@ -93,6 +101,7 @@ export function openSheet(opts: SheetOptions, ...content: (Node | string)[]): Sh
   }
   document.body.append(backdrop);
   stack.push({ el: panel, opts, restore, close });
+  syncInert();
   requestAnimationFrame(() => {
     const first = focusables(panel).find((el) => !el.classList.contains('sheet-close')) ?? focusables(panel)[0];
     (first ?? panel).focus({ preventScroll: true });

@@ -30,7 +30,7 @@
   --surface-2: #eceee6;
   --ink: #17201c;
   --ink-2: #47534d;
-  --ink-3: #6a7771;
+  --ink-3: #58645e;
   --line: rgba(23, 32, 28, 0.14);
   --accent: #8a6420;
   --accent-soft: rgba(138, 100, 32, 0.12);
@@ -376,6 +376,16 @@ kbd {
 .menu-btn-sub {
   font-size: 0.86em;
   opacity: 0.8;
+}
+
+/* Full strength on the filled button, where faded text would lose contrast. */
+.menu-btn--primary .menu-btn-sub {
+  opacity: 1;
+}
+
+.sheet-body:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .menu-secondary {
@@ -1323,8 +1333,13 @@ kbd {
   display: none;
 }
 
+/* Folded: muted colour and a faded avatar, while names, stacks and badges stay readable. */
 .seat.is-folded .seat-plate {
-  opacity: 0.55;
+  filter: saturate(0.25) brightness(0.85);
+}
+
+.seat.is-folded .avatar {
+  opacity: 0.5;
 }
 
 .seat.is-sitting-out .seat-plate {
@@ -2495,7 +2510,7 @@ input[type="checkbox"][role="switch"]:checked::after {
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid var(--line);
-  background: var(--bg);
+  background: var(--surface);
 }
 
 .achievement.is-earned {
@@ -2503,8 +2518,13 @@ input[type="checkbox"][role="switch"]:checked::after {
   background: var(--accent-soft);
 }
 
+/* Locked: hollow star and a dashed edge; text keeps full contrast. */
 .achievement.is-locked {
-  opacity: 0.72;
+  border-style: dashed;
+}
+
+.achievement.is-locked .ach-mark {
+  color: var(--ink-3);
 }
 
 .ach-mark {
