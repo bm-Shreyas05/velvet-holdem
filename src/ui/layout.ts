@@ -81,6 +81,31 @@ export function chooseOrientation(width: number, height: number, seatCount: numb
   return portrait > landscape ? 'portrait' : 'landscape';
 }
 
+/**
+ * Where seats sit around the ring, as angles from the bottom (the player's seat). Up to six seats
+ * use equal angles; larger tables space seats by equal distance along the ring instead, because
+ * equal angles crowd the narrow ends of the ellipse (on a tall portrait table the two top seats
+ * would overlap).
+ */
+function seatAngles(n: number, ring: { rx: number; ry: number }): number[] {
+  if (n <= 6) return Array.from({ length: n }, (_, i) => (i / n) * Math.PI * 2);
+  const steps = 2048;
+  const cumulative = [0];
+  for (let k = 1; k <= steps; k++) {
+    const t = (k - 0.5) * ((Math.PI * 2) / steps);
+    const ds = Math.hypot(ring.rx * Math.cos(t), ring.ry * Math.sin(t)) * ((Math.PI * 2) / steps);
+    cumulative.push(cumulative[k - 1]! + ds);
+  }
+  const perimeter = cumulative[steps]!;
+  return Array.from({ length: n }, (_, i) => {
+    const target = (i / n) * perimeter;
+    let k = 0;
+    while (k < steps && cumulative[k + 1]! < target) k++;
+    const within = (target - cumulative[k]!) / (cumulative[k + 1]! - cumulative[k]!);
+    return (k + within) * ((Math.PI * 2) / steps);
+  });
+}
+
 export function computeLayout(seatCount: number, orientation: Orientation): StageLayout {
   const landscape = orientation === 'landscape';
   const width = landscape ? 1000 : 640;
@@ -90,8 +115,9 @@ export function computeLayout(seatCount: number, orientation: Orientation): Stag
   const board = { x: table.cx, y: table.cy - (landscape ? 22 : 70) };
   const pot = { x: table.cx, y: table.cy + (landscape ? 58 : 40) };
   const seats: SeatGeometry[] = [];
+  const angles = seatAngles(seatCount, seatRing);
   for (let i = 0; i < seatCount; i++) {
-    const theta = (i / seatCount) * Math.PI * 2;
+    const theta = angles[i]!;
     const sx = -Math.sin(theta);
     const sy = Math.cos(theta);
     const anchor = { x: table.cx + seatRing.rx * sx, y: table.cy + seatRing.ry * sy };

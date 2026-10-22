@@ -167,7 +167,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'champion', title: 'Champion', description: 'Win a tournament.', unlocks: { felt: 'royal' } },
   { id: 'champion-pro', title: 'Professional', description: 'Win a tournament against Pro opponents.' },
   { id: 'champion-elite', title: 'Elite', description: 'Win a tournament against Elite opponents.', unlocks: { felt: 'midnight' } },
-  { id: 'full-table', title: 'Last one standing', description: 'Win a tournament against five opponents.' },
+  { id: 'full-table', title: 'Last one standing', description: 'Win a tournament against five or more opponents.' },
   { id: 'itm', title: 'In the money', description: 'Finish in a paid place of a tournament that pays more than first.', unlocks: { cardBack: 'emerald' } },
   { id: 'bubble', title: 'So close', description: 'Finish one place short of the prizes.', secret: true },
   { id: 'double-ko', title: 'Two for one', description: 'Knock out two players in the same hand.' },

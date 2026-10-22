@@ -67,7 +67,7 @@ export interface NewGameSetup {
 }
 
 export const MIN_OPPONENTS = 1;
-export const MAX_OPPONENTS = 5;
+export const MAX_OPPONENTS = 8;
 
 export function defaultSetup(): NewGameSetup {
   return {
@@ -204,7 +204,8 @@ export function dailySetup(dateKey: string, playerName: string): NewGameSetup {
   const styles = [...STYLE_ORDER];
   const opponents: OpponentSetup[] = [];
   const count = 3 + randomInt(rng, 2); // 3 or 4 opponents
-  const personas = [...DEFAULT_PERSONAS];
+  // The original five names only: adding personas must never change past or present dailies.
+  const personas = DEFAULT_PERSONAS.slice(0, 5);
   for (let i = 0; i < count; i++) {
     const style = styles.splice(randomInt(rng, styles.length), 1)[0]!;
     const persona = personas.splice(randomInt(rng, personas.length), 1)[0]!;

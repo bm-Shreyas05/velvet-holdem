@@ -127,6 +127,9 @@ export const DEFAULT_PERSONAS: OpponentPersona[] = [
   { name: 'Margot Hale', style: 'rock' },
   { name: 'Nora Quill', style: 'trapper' },
   { name: 'Benny Tuck', style: 'station' },
+  { name: 'Iris Vale', style: 'shark' },
+  { name: 'Dex Moreau', style: 'maniac' },
+  { name: 'Opal Finch', style: 'trapper' },
 ];
 
 export type Difficulty = 'casual' | 'standard' | 'pro' | 'elite';

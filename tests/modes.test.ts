@@ -172,3 +172,19 @@ test('daily challenge: the same table and the same deals for everyone on a date'
   assert.equal(dailySetup('2026-10-02', a.opponents[0]!.name).playerName, 'You');
   assert.match(todayKey(new Date(2026, 0, 5)), /^2026-01-05$/);
 });
+
+test('daily challenge tables never change once published (adding personas must not shift them)', () => {
+  assert.deepEqual(dailySetup('2026-10-07', 'You').opponents, [
+    { name: 'Rico Vance', style: 'shark' },
+    { name: 'Benny Tuck', style: 'station' },
+    { name: 'Silas Crane', style: 'maniac' },
+    { name: 'Margot Hale', style: 'rock' },
+  ]);
+});
+
+test('tables seat up to nine players', () => {
+  const nine = { ...defaultSetup(), opponents: Array.from({ length: 8 }, (_, i) => ({ name: `Opponent ${i + 1}`, style: 'random' as const })) };
+  assert.equal(validateSetup(nine), null);
+  assert.match(validateSetup({ ...nine, opponents: [...nine.opponents, { name: 'One too many', style: 'random' }] }) ?? '', /between 1 and 8 opponents/);
+  assert.equal(createSession(nine).seats.length, 9);
+});

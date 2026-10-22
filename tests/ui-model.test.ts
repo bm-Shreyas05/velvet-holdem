@@ -168,3 +168,20 @@ test('layout: orientation follows the larger table and does not flip on small re
   // ... but a clear gain switches.
   assert.equal(chooseOrientation(w, h * 1.4, 4, 'landscape'), 'portrait');
 });
+
+test('layout: name plates never overlap, from heads-up to nine-handed, in both orientations', () => {
+  for (const orientation of ['landscape', 'portrait'] as const) {
+    for (let n = 2; n <= 9; n++) {
+      const seats = computeLayout(n, orientation).seats;
+      for (let a = 0; a < n; a++) {
+        for (let b = a + 1; b < n; b++) {
+          const p = seats[a]!.anchor;
+          const q = seats[b]!.anchor;
+          // Widest plate is 190 units; plates are about 50 tall around the anchor.
+          const overlap = Math.abs(p.x - q.x) < 190 && Math.abs(p.y - q.y) < 56;
+          assert.ok(!overlap, `${orientation} ${n} seats: seats ${a} and ${b} overlap`);
+        }
+      }
+    }
+  }
+});

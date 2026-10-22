@@ -55,7 +55,7 @@ All-in) and the amount field all feed one validated amount.
 
 ### Ways to play
 
-**Tournament** (*New game → Tournament*): your name, 1–5 opponents (name and style each),
+**Tournament** (*New game → Tournament*): your name, 1–8 opponents (name and style each),
 difficulty, starting chips, blinds, the blind structure (Turbo every 8 hands, Standard every 12,
 Deep every 20, or fixed), antes (a tenth of the big blind from level 4, when the blinds rise) and
 prizes — winner-take-all, top 2 (65/35) or top 3 (50/30/20) of a pool of 100 points per player.
@@ -95,7 +95,7 @@ every save to a file and imports it in another browser or on another device.
 ## Tests and verification
 
 ```bash
-npm test                 # 108 unit and integration tests
+npm test                 # 111 unit and integration tests
 npm run test:e2e         # browser tests: Chromium, Firefox, WebKit, iPhone and Android sizes
 npm run simulate         # stress simulation (200k random hands, 400 freeze-outs, 200 cash
                          # sessions, 12 AI games)
@@ -140,6 +140,10 @@ What the checks cover:
 - **Saves and backups.** Round trip, damaged newest save (falls back to the previous one), edited
   payload (checksum), foreign data, newer versions (refused), older versions (migrated), failed
   writes; backups are verified in a scratch store before anything is replaced.
+- **Accessibility.** axe-core checks every screen and sheet against WCAG 2.1 A and AA rules in
+  light and dark themes: the menu, setup, statistics, history, achievements, help, settings, the
+  table on your turn, the pause menu, hand detail and the replay with the coach. Open sheets make
+  the page behind them inert. Automated rules do not replace a pass with a real screen reader.
 - **Real browsers** (`npm run test:e2e`, Playwright; run `npx playwright install` once first).
   In desktop Chromium, Firefox and WebKit and in iPhone 13 and Pixel 7 emulation: the menu loads
   without errors or sideways scrolling; hands are played against the AI in its Web Worker with
@@ -349,8 +353,7 @@ snapshots for debugging. None of this is visible in normal play.
 
 ## Known limitations
 
-- One table of up to six players (you and five opponents); the engine itself supports up to ten
-  seats.
+- One table of up to nine players (you and eight opponents); the engine itself supports ten.
 - No online play: there are no global leaderboards or games against other people, which would
   need a server, accounts and moderation. The daily challenge's result can be shared as text.
 - The AI is a strong heuristic player, not a solver: it models opponents with summary statistics
