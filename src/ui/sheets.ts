@@ -745,7 +745,7 @@ export function openHelp(app: App, onClose?: () => void): SheetHandle {
         h(
           'p',
           {},
-          'The game runs entirely in your browser. Your games, history, statistics and settings are stored only on this device; nothing is sent anywhere, and there are no accounts, ads or tracking.',
+          'The game runs entirely in your browser. Your games, history, statistics and settings are stored only on this device; nothing is sent anywhere, and there are no accounts, ads or tracking. Games with friends are the exception: the game passes directly between the players’ browsers, and public relay servers help those browsers find each other (so they see your IP address).',
         ),
       ),
     ),
@@ -785,7 +785,12 @@ export function openPauseMenu(app: App, resume: () => void): SheetHandle {
             app.cashOut();
           })
         : null,
-      btn('Leave table', () => {
+      btn(app.onlineRole === 'host' ? 'End the game' : 'Leave table', async () => {
+        if (
+          app.onlineRole === 'host' &&
+          !(await confirm('End the game?', 'Your browser runs this table, so leaving ends the game for everyone.', 'End the game', true))
+        )
+          return;
         leaving = true;
         sheet.close();
         app.quitToMenu();
@@ -793,9 +798,13 @@ export function openPauseMenu(app: App, resume: () => void): SheetHandle {
       h(
         'p',
         { class: 'fine' },
-        app.inCashGame
-          ? 'Cash out to end the session and count your result. Leave the table to take a break and continue later from the main menu.'
-          : 'Your game is saved after every action. Leave any time and continue later from the main menu.',
+        app.onlineRole === 'host'
+          ? 'Your friends are waiting while the game is paused. Games with friends are not saved.'
+          : app.onlineRole === 'guest'
+            ? 'The game carries on while this menu is open. If you leave, your hands fold until you rejoin with the same link.'
+            : app.inCashGame
+              ? 'Cash out to end the session and count your result. Leave the table to take a break and continue later from the main menu.'
+              : 'Your game is saved after every action. Leave any time and continue later from the main menu.',
       ),
     ),
   );
@@ -828,7 +837,7 @@ export function openGameOver(app: App, data: { title: string; info: GameOverInfo
           `${chips(stats.handsPlayed)} hands played · won ${chips(stats.handsWon)} (${pct(d.winRate)}) · showdowns won ${stats.showdownsWon} of ${stats.showdowns}.`,
         )
       : null;
-  const again = h('button', { type: 'button', class: 'btn btn--primary' }, 'Play again');
+  const again = h('button', { type: 'button', class: 'btn btn--primary' }, app.onlineRole === 'host' ? 'Rematch' : 'Play again');
   const setup = h('button', { type: 'button', class: 'btn' }, 'New game');
   const review = h('button', { type: 'button', class: 'btn' }, 'Review hands');
   const menu = h('button', { type: 'button', class: 'btn' }, 'Main menu');
@@ -855,7 +864,8 @@ export function openGameOver(app: App, data: { title: string; info: GameOverInfo
     dailyNote(app, snapshot),
     list,
     summary ?? '',
-    h('div', { class: 'sheet-actions' }, review, menu, setup, again),
+    app.onlineRole === 'guest' ? h('p', { class: 'sheet-message muted' }, 'If the host starts a rematch, you will be taken back to the table.') : '',
+    h('div', { class: 'sheet-actions' }, review, menu, app.onlineRole ? null : setup, app.onlineRole === 'guest' ? null : again),
   );
   again.addEventListener('click', () => {
     sheet.close();

@@ -34,6 +34,8 @@ export interface PresenterDeps {
   waitForNextHand: (autoMs: number) => Promise<void>;
   /** The coach's one-line suggestion for the player's decision (when coach hints are on). */
   advise?: (snapshot: TableSnapshot) => Promise<string | null>;
+  /** Online games: whether this screen belongs to the host or to a friend who joined. */
+  online?: 'host' | 'guest';
   debug: boolean;
 }
 
@@ -352,12 +354,26 @@ export class DomPresenter implements Presenter {
 
   async humanEliminated(place: number, fieldSize: number): Promise<EliminationChoice> {
     this.#d.bar.idle(`You finished ${ordinal(place)}`);
+    const online = this.#d.online;
     const msg = h(
       'div',
       {},
       h('p', { class: 'result-line' }, `You finished ${ordinal(place)} of ${fieldSize}.`),
-      h('p', { class: 'sheet-message' }, 'The remaining players will play on until one of them holds every chip.'),
+      h(
+        'p',
+        { class: 'sheet-message' },
+        online === 'host'
+          ? 'Your friends play on until one player holds every chip. Your browser runs the table, so leaving now ends the game for everyone.'
+          : 'The remaining players will play on until one of them holds every chip.',
+      ),
     );
+    // Online, the game cannot skip ahead: other people are still playing.
+    if (online) {
+      return choose<EliminationChoice>('You’re out', msg, [
+        { id: 'menu', label: online === 'host' ? 'End the game' : 'Leave the table', danger: online === 'host' },
+        { id: 'watch', label: 'Watch the finish', primary: true },
+      ]);
+    }
     return choose<EliminationChoice>('You’re out', msg, [
       { id: 'menu', label: 'Main menu' },
       { id: 'watch', label: 'Watch the finish' },

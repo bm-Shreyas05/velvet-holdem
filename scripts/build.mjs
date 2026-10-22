@@ -25,6 +25,9 @@ const common = { bundle: true, write: false, target: browsers, minify: !dev, sou
 const t0 = performance.now();
 const worker = await build({ ...common, entryPoints: ['src/ai/worker.ts'], format: 'iife' });
 const workerCode = worker.outputFiles[0].text;
+// Online play's WebRTC layer: a separate file, loaded only when a table with friends is opened.
+const net = await build({ ...common, entryPoints: ['src/net/trystero-entry.ts'], format: 'iife' });
+const netCode = net.outputFiles[0].text;
 const app = await build({
   ...common,
   entryPoints: ['src/main.ts'],
@@ -59,16 +62,19 @@ const artifact = `${title}\n<style>${styles}</style>\n<div id="app" data-screen=
 await mkdir(resolve(root, 'dist'), { recursive: true });
 await writeFile(resolve(root, 'dist/index.html'), html);
 await writeFile(resolve(root, 'dist/artifact.html'), artifact);
+await writeFile(resolve(root, 'dist/net.js'), netCode);
 
 // Web hosting: static assets plus a service worker that precaches this exact build.
 await cp(resolve(root, 'public'), resolve(root, 'dist'), { recursive: true });
-const assets = ['./', ...(await readdir(resolve(root, 'public'))).filter((f) => f !== 'og-image.png').sort()];
-const hash = createHash('sha256').update(html);
-for (const file of assets.slice(1)) hash.update(file).update(await readFile(resolve(root, 'public', file)));
+const publicFiles = (await readdir(resolve(root, 'public'))).filter((f) => f !== 'og-image.png').sort();
+// net.js is left out of the precache (most players never open online play); it is cached on first use.
+const assets = ['./', ...publicFiles];
+const hash = createHash('sha256').update(html).update(netCode);
+for (const file of publicFiles) hash.update(file).update(await readFile(resolve(root, 'public', file)));
 const version = hash.digest('hex').slice(0, 12);
 const sw = (await readFile(resolve(root, 'src/pwa/sw.js'), 'utf8')).replaceAll('__VERSION__', version).replaceAll('__ASSETS__', JSON.stringify(assets));
 await writeFile(resolve(root, 'dist/sw.js'), sw);
 const kb = (n) => `${(n / 1024).toFixed(0)} KB`;
 console.log(
-  `Built dist/index.html (${kb(html.length)}; app ${kb(js.length)}, AI worker ${kb(workerCode.length)}, styles ${kb(styles.length)}), service worker ${version}${siteUrl ? ` for ${siteUrl}` : ''} in ${Math.round(performance.now() - t0)} ms`,
+  `Built dist/index.html (${kb(html.length)}; app ${kb(js.length)}, AI worker ${kb(workerCode.length)}, styles ${kb(styles.length)}), net.js ${kb(netCode.length)}, service worker ${version}${siteUrl ? ` for ${siteUrl}` : ''} in ${Math.round(performance.now() - t0)} ms`,
 );

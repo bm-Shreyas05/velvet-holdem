@@ -40,6 +40,16 @@ for (const scheme of ['light', 'dark'] as const) {
       await audit(page, 'setup (tournament)');
       await page.getByRole('radio', { name: 'Cash game' }).click();
       await audit(page, 'setup (cash)');
+
+      // Play with friends (a local transport: no public relays in tests).
+      await page.goto('./#dev&net=local');
+      await page.reload(); // only the #fragment changed
+      await page.getByRole('button', { name: /Play with friends/ }).click();
+      await audit(page, 'play with friends');
+      await page.getByLabel('Your name').fill('Hal');
+      await page.getByRole('button', { name: 'Create a table' }).click();
+      await expect(page.locator('.lobby-code')).toBeVisible();
+      await audit(page, 'host lobby');
     });
 
     test(`accessibility: the table on your turn (${scheme})`, async ({ page }, info) => {

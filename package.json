@@ -17,6 +17,7 @@
     "check": "npm run lint && npm run typecheck && npm test && node scripts/simulate.ts --quick && npm run build",
     "test:e2e": "node scripts/build.mjs && playwright test",
     "gen:images": "node scripts/gen-images.ts",
+    "gen:sounds": "node scripts/gen-sounds.ts",
     "lint": "biome check .",
     "format": "biome check --write ."
   },
@@ -31,5 +32,8 @@
   },
   "engines": {
     "node": ">=22.18.0"
+  },
+  "dependencies": {
+    "trystero": "0.26.0"
   }
 }

@@ -66,6 +66,11 @@ export function dialogOpen(): boolean {
   return stack.length > 0;
 }
 
+/** Closes every open sheet, newest first (when the screen changes under them). */
+export function closeAllSheets(): void {
+  for (const s of [...stack].reverse()) s.close();
+}
+
 export function openSheet(opts: SheetOptions, ...content: (Node | string)[]): SheetHandle {
   const titleId = `sheet-title-${Math.random().toString(36).slice(2, 8)}`;
   // Focusable so keyboard users can scroll long sheets that contain nothing else to focus.

@@ -62,6 +62,7 @@ export function openReplayer(app: App, record: HandHistoryRecord, opts: ReplayOp
       daily: null,
       prizes: [],
       cash: null,
+      online: false,
     };
   };
 
@@ -82,7 +83,7 @@ export function openReplayer(app: App, record: HandHistoryRecord, opts: ReplayOp
     setHint: () => undefined,
     waiting: false,
   };
-  const table = new TableView(setup.seats.length, motion, () => app.settings);
+  const table = new TableView(setup.seats.length, motion, () => app.settings, human);
   // Sound plays while stepping forward, but not while fast-forwarding to a jumped-to step.
   let silent = false;
   const audio = {

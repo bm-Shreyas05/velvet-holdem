@@ -77,6 +77,15 @@ export function renderMenu(app: App): HTMLElement {
   daily.addEventListener('click', () => void app.startDaily());
   primary.push(daily);
 
+  const friends = h(
+    'button',
+    { type: 'button', class: 'menu-btn' },
+    h('span', { class: 'menu-btn-label' }, 'Play with friends'),
+    h('span', { class: 'menu-btn-sub' }, 'Host a table or join one with a code'),
+  );
+  friends.addEventListener('click', () => app.showFriends());
+  primary.push(friends);
+
   const notice =
     saved && !saved.ok
       ? h(
@@ -151,7 +160,7 @@ export function renderMenu(app: App): HTMLElement {
       h(
         'p',
         { class: 'menu-fine menu-fine--legal' },
-        'Play money only. Chips have no cash value and cannot be bought, sold or won. Everything stays in this browser.',
+        'Play money only. Chips have no cash value and cannot be bought, sold or won. Everything stays in this browser, except games with friends, which pass directly between your devices.',
       ),
     ),
   );

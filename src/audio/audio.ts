@@ -1,10 +1,13 @@
 import type { Settings } from '../game/settings.ts';
+import { parseSoundBank } from './samples.ts';
 
 /**
- * Procedural sound design with the Web Audio API: every sound is synthesised on the fly, with
- * small random variations in pitch, timing and colour so repeated actions never sound identical.
- * Four buses (master, effects, interface, ambience) map to the volume controls. If audio is
- * unavailable or blocked the engine silently becomes a no-op; the game never depends on it.
+ * Sound with the Web Audio API. Cards and chips use real recordings (src/audio/samples.ts), picked
+ * from several takes and varied in pitch and level so repeated actions never sound identical;
+ * everything else — and every sound until the recordings arrive, or if they cannot be loaded — is
+ * synthesised on the fly. Four buses (master, effects, interface, ambience) map to the volume
+ * controls. If audio is unavailable or blocked the engine silently becomes a no-op; the game never
+ * depends on it.
  */
 export type SoundName =
   | 'shuffle'
@@ -58,13 +61,23 @@ export class AudioEngine {
   #ambienceNodes: AudioNode[] = [];
   #ambienceTimer: ReturnType<typeof setTimeout> | null = null;
   #last = new Map<SoundName, number>();
+  #bank = new Map<string, AudioBuffer[]>();
+  #bankRequested = false;
+  readonly #bankUrl: string | null;
 
-  constructor(settings: Settings['audio']) {
+  /** `bankUrl`: where the recordings live (null = synthesise everything). */
+  constructor(settings: Settings['audio'], bankUrl: string | null = null) {
     this.#settings = { ...settings };
+    this.#bankUrl = bankUrl;
   }
 
   get available(): boolean {
     return !this.#failed;
+  }
+
+  /** True once the recorded sounds are loaded and in use. */
+  get recorded(): boolean {
+    return this.#bank.size > 0;
   }
 
   /** Must be called from a user gesture (browsers block audio until then). */
@@ -95,6 +108,7 @@ export class AudioEngine {
         this.#brown = this.#makeNoise(4, 'brown');
         this.#applyGains();
         this.#syncAmbience();
+        void this.#loadBank();
       }
       // iOS also reports 'interrupted' after calls or backgrounding; any non-running state resumes.
       if (this.#ctx.state !== 'running' && this.#ctx.state !== 'closed') void this.#ctx.resume();
@@ -134,6 +148,52 @@ export class AudioEngine {
       }
     }
     return buf;
+  }
+
+  async #loadBank(): Promise<void> {
+    if (this.#bankRequested || !this.#bankUrl) return;
+    this.#bankRequested = true;
+    try {
+      const response = await fetch(this.#bankUrl);
+      if (!response.ok) return;
+      const bank = parseSoundBank(await response.arrayBuffer());
+      const ctx = this.#ctx;
+      if (!bank || !ctx) return;
+      for (const [name, clips] of Object.entries(bank.clips)) {
+        this.#bank.set(
+          name,
+          clips.map((data) => {
+            const buf = ctx.createBuffer(1, data.length, bank.rate);
+            buf.getChannelData(0).set(data);
+            return buf;
+          }),
+        );
+      }
+    } catch {
+      /* offline without a cached copy, or opened from a file: keep synthesising */
+    }
+  }
+
+  /** Plays a random take of a recording; false if it is not loaded (the caller synthesises instead). */
+  #sample(bus: GainNode, name: string, at: number, gain: number, lowpass?: number): boolean {
+    const takes = this.#bank.get(name);
+    if (!takes?.length) return false;
+    const ctx = this.#ctx!;
+    const src = ctx.createBufferSource();
+    src.buffer = takes[Math.floor(Math.random() * takes.length)]!;
+    src.playbackRate.value = this.#vary(1, 0.05);
+    const g = ctx.createGain();
+    g.gain.value = this.#vary(gain, 0.12);
+    let node: AudioNode = src;
+    if (lowpass) {
+      const f = ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = lowpass;
+      node = node.connect(f);
+    }
+    node.connect(g).connect(bus);
+    src.start(at);
+    return true;
   }
 
   #vary(x: number, amount = 0.08): number {
@@ -196,24 +256,36 @@ export class AudioEngine {
     try {
       switch (name) {
         case 'shuffle':
+          if (this.#sample(bus, 'shuffle', t, 0.55)) break;
           for (let i = 0; i < 22; i++) this.#noiseBurst(bus, t + i * this.#vary(0.018, 0.3), 0.03, 'highpass', this.#vary(2600), 0.7, 0.18);
           this.#noiseBurst(bus, t + 0.42, 0.12, 'bandpass', 1400, 0.8, 0.22);
           break;
         case 'deal':
+          if (this.#sample(bus, 'deal', t, 0.5)) break;
           this.#noiseBurst(bus, t, this.#vary(0.06), 'bandpass', this.#vary(3000, 0.18), 0.9, 0.35);
           this.#tone(bus, t + 0.035, this.#vary(190), 0.05, 0.12);
           break;
         case 'flip':
+          if (this.#sample(bus, 'flip', t, 0.5)) break;
           this.#noiseBurst(bus, t, 0.035, 'highpass', this.#vary(3200), 0.6, 0.3);
           this.#noiseBurst(bus, t + this.#vary(0.045), 0.03, 'bandpass', this.#vary(2100), 1, 0.2);
           break;
         case 'chips':
+          if (this.#sample(bus, intensity < 2 ? 'chipLay' : 'chipStack', t, 0.5)) break;
           this.#chipClicks(bus, t, Math.round(2 + Math.min(4, intensity * 2)), 0.035, 0.22);
           break;
         case 'chipsBig':
+          if (this.#sample(bus, 'handle', t, 0.5)) {
+            this.#sample(bus, 'chipStack', t + this.#vary(0.12, 0.2), 0.4);
+            break;
+          }
           this.#chipClicks(bus, t, 9, 0.03, 0.22);
           break;
         case 'collect':
+          if (this.#sample(bus, 'collide', t, 0.45)) {
+            this.#sample(bus, 'collide', t + this.#vary(0.07, 0.3), 0.35);
+            break;
+          }
           this.#chipClicks(bus, t, 6, 0.022, 0.16);
           this.#noiseBurst(bus, t, 0.18, 'bandpass', 900, 0.8, 0.07);
           break;
@@ -224,10 +296,11 @@ export class AudioEngine {
           }
           break;
         case 'fold':
+          if (this.#sample(bus, 'fold', t, 0.4)) break;
           this.#noiseBurst(bus, t, 0.22, 'bandpass', this.#vary(2200), 0.9, 0.2, 500);
           break;
         case 'allIn':
-          this.#chipClicks(bus, t, 12, 0.026, 0.24);
+          if (!this.#sample(bus, 'riffle', t, 0.55)) this.#chipClicks(bus, t, 12, 0.026, 0.24);
           this.#tone(bus, t, 72, 0.5, 0.35, 'sine', 52);
           break;
         case 'win':
@@ -241,7 +314,7 @@ export class AudioEngine {
             this.#tone(bus, t + i * 0.1, f, 0.9, 0.13, 'sine');
             this.#tone(bus, t + i * 0.1, f * 1.5, 0.5, 0.03, 'triangle');
           });
-          this.#chipClicks(bus, t + 0.35, 10, 0.03, 0.18);
+          if (!this.#sample(bus, 'handle', t + 0.35, 0.4)) this.#chipClicks(bus, t + 0.35, 10, 0.03, 0.18);
           break;
         case 'lose':
           this.#tone(bus, t, 392, 0.35, 0.08);
@@ -301,7 +374,12 @@ export class AudioEngine {
       this.#ambienceNodes = [src, lfo];
       const riffle = () => {
         if (!this.#ambienceNodes.length || !this.#ctx) return;
-        if (this.#ctx.state === 'running') this.#chipClicks(bus, this.#ctx.currentTime + 0.01, 4 + Math.floor(Math.random() * 5), 0.03, 0.05);
+        if (this.#ctx.state === 'running') {
+          const at = this.#ctx.currentTime + 0.01;
+          // A distant table: the recording, muffled and quiet, when it is loaded.
+          if (!this.#sample(bus, Math.random() < 0.5 ? 'handle' : 'collide', at, 0.12, 1800))
+            this.#chipClicks(bus, at, 4 + Math.floor(Math.random() * 5), 0.03, 0.05);
+        }
         this.#ambienceTimer = setTimeout(riffle, 7000 + Math.random() * 9000);
       };
       this.#ambienceTimer = setTimeout(riffle, 5000);

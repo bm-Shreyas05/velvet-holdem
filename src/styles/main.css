@@ -682,6 +682,127 @@ kbd {
   gap: 12px;
 }
 
+/* ---- Games with friends -------------------------------------------------------------------- */
+
+.setup-section--quiet {
+  background: transparent;
+}
+
+.setup-section--quiet p {
+  margin: 0;
+}
+
+.join-row,
+.invite-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.join-row .field {
+  flex: 1;
+}
+
+.join-row input,
+.invite-row input,
+.lobby-options select {
+  min-height: 40px;
+  padding: 6px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  width: 100%;
+  min-width: 0;
+}
+
+.join-row input {
+  font: 600 1.1em / 1 var(--font-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.join-row .btn,
+.invite-row .btn {
+  min-height: 40px;
+  flex: none;
+}
+
+.invite-row input {
+  flex: 1;
+  color: var(--ink-2);
+}
+
+.lobby-code {
+  margin: 0;
+  font: 700 2.4em / 1.1 var(--font-ui);
+  letter-spacing: 0.12em;
+  font-variant-numeric: tabular-nums;
+}
+
+.lobby-status {
+  margin: 4px 0 0;
+  color: var(--ink-2);
+}
+
+.lobby-players {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lobby-players li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 4px 10px;
+  border-radius: 9px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+}
+
+.lobby-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.lobby-note {
+  margin-left: auto;
+  font-size: 0.84em;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.lobby-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .lobby-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .invite-row {
+    flex-wrap: wrap;
+  }
+
+  .invite-row input {
+    flex-basis: 100%;
+  }
+
+  .lobby-code {
+    font-size: 2em;
+  }
+}
+
 /* ---- Table screen layout ------------------------------------------------------------------- */
 
 .screen-table {

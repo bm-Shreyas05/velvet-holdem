@@ -62,8 +62,12 @@ export class TableView {
   #sidePotInfo: SidePotInfo[] = [];
   #observer: ResizeObserver | null = null;
 
-  constructor(seatCount: number, motion: Motion, settings: () => Settings) {
+  /** The seat drawn at the bottom: the viewer's (a friend in an online game sits elsewhere). */
+  readonly #viewSeat: number;
+
+  constructor(seatCount: number, motion: Motion, settings: () => Settings, viewSeat = 0) {
     this.#seatCount = seatCount;
+    this.#viewSeat = viewSeat;
     this.#motion = motion;
     this.#settings = settings;
     this.root = h('div', { class: 'stage-wrap' });
@@ -108,7 +112,10 @@ export class TableView {
 
   #build(orientation: Orientation): void {
     this.#orientation = orientation;
-    this.#layout = computeLayout(this.#seatCount, orientation);
+    const base = computeLayout(this.#seatCount, orientation);
+    // Rotate the ring so the viewer's seat takes the bottom place and the others follow in order.
+    const n = this.#seatCount;
+    this.#layout = this.#viewSeat ? { ...base, seats: base.seats.map((_, s) => base.seats[(s - this.#viewSeat + n) % n]!) } : base;
     const L = this.#layout;
     clear(this.root);
     this.#stage = h('div', { class: `stage stage--${orientation}`, style: `width:${L.width}px;height:${L.height}px` });
@@ -161,7 +168,7 @@ export class TableView {
     }
     for (let i = 0; i < this.#seatCount; i++) {
       const g = L.seats[i]!;
-      const isHero = i === 0;
+      const isHero = i === this.#viewSeat;
       const els: SeatEls = {
         root: h('div', { class: `seat ${isHero ? 'seat--hero' : 'seat--ai'} side-${g.side}`, style: this.#pos(g.anchor), 'data-seat': i }),
         cards: h('div', { class: 'seat-cards' }),
@@ -299,7 +306,7 @@ export class TableView {
     if (e.name.textContent !== s.name) {
       e.name.textContent = s.name;
       e.avatar.innerHTML = avatarSvg(s.name, s.style);
-      e.avatar.title = s.style ? STYLES[s.style].label : 'You';
+      e.avatar.title = s.style ? STYLES[s.style].label : isHero ? 'You' : 'Friend';
     }
     e.stack.textContent = s.eliminated ? '' : chips(s.stack);
     let status = '';

@@ -20,7 +20,8 @@ export interface SeatSnapshot {
   seat: number;
   id: string;
   name: string;
-  kind: 'human' | 'ai';
+  /** Relative to the viewer: 'human' is the viewer; 'remote' is any other person at the table. */
+  kind: 'human' | 'ai' | 'remote';
   style: StyleId | null;
   stack: number;
   eliminated: boolean;
@@ -48,6 +49,8 @@ export interface TableSnapshot {
   prizes: number[];
   /** Cash games: the buy-in and how many times the human has bought in. */
   cash: { buyIn: number; humanBuyIns: number; leaving: boolean } | null;
+  /** Other people are playing at this table from their own devices. */
+  online: boolean;
 }
 
 /** Result of a cash-game session, reported when the human cashes out. */
@@ -128,10 +131,18 @@ class StopSignal extends Error {}
  * Runs a game: deals hands, asks the human or the AI for decisions, applies them through the
  * engine, verifies every invariant after every action, and records results. The controller is
  * the only holder of the engine objects; the interface and the AI receive views.
+ *
+ * Online games add remote seats, each with its own presenter (src/net/remote.ts) that receives
+ * exactly what that player may see, built from their own view. The local presenter paces the
+ * game; remote presenters are told what happened without being waited for, except for their
+ * own decisions.
  */
 export class GameController {
   readonly #session: SessionData;
   readonly #presenter: Presenter;
+  readonly #remotes: ReadonlyMap<number, Presenter>;
+  /** Where each remote player finished (the local human's is in the session). */
+  readonly #finishes = new Map<number, { place: number; handNumber: number }>();
   readonly #ai: AiHost;
   readonly #hooks: ControllerHooks;
   #table: TableGame;
@@ -148,9 +159,11 @@ export class GameController {
   /** Events of a freshly dealt hand, presented on the next loop turn (after the save). */
   #pendingEvents: HandEvent[] | null = null;
 
-  constructor(session: SessionData, presenter: Presenter, ai: AiHost, hooks: ControllerHooks = {}) {
+  constructor(session: SessionData, presenter: Presenter, ai: AiHost, hooks: ControllerHooks = {}, remotes: ReadonlyMap<number, Presenter> = new Map()) {
     this.#session = session;
     this.#presenter = presenter;
+    this.#remotes = remotes;
+    for (const p of session.table.players) if (p.place !== null && p.seat !== session.humanSeat) this.#finishes.set(p.seat, { place: p.place, handNumber: 0 });
     this.#ai = ai;
     this.#hooks = hooks;
     this.#table = TableGame.restore(session.table);
@@ -198,12 +211,17 @@ export class GameController {
   // -------------------------------------------------------------------------------------------
 
   snapshot(): TableSnapshot {
+    return this.snapshotFor(this.#session.humanSeat);
+  }
+
+  /** The table as one player sees it: their own view, and seat kinds relative to them. */
+  snapshotFor(viewer: number): TableSnapshot {
     const t = this.#table;
     const hand = t.hand;
     const handNumber = hand ? t.handNumber : t.handNumber + 1;
     const levelIdx = t.levelIndexForHand(t.handInProgress || t.awaitingSettlement ? t.handNumber : t.handNumber + 1);
     const levels = t.config.levels;
-    const view = hand ? hand.viewFor(this.#session.humanSeat) : null;
+    const view = hand ? hand.viewFor(viewer) : null;
     const handLive = !!view && (t.handInProgress || t.awaitingSettlement);
     return {
       handNumber,
@@ -215,14 +233,14 @@ export class GameController {
           seat: p.seat,
           id: p.id,
           name: info.name,
-          kind: info.kind,
+          kind: p.seat === viewer ? 'human' : info.kind === 'ai' ? 'ai' : 'remote',
           style: info.style,
           stack: handLive && seatView?.inHand ? seatView.stack : p.stack,
           eliminated: p.eliminated,
           place: p.place,
         };
       }),
-      humanSeat: this.#session.humanSeat,
+      humanSeat: viewer,
       blinds: view ? { ...view.blinds } : t.blindsForHand(t.handNumber + 1),
       level: levelIdx + 1,
       handsUntilNextLevel: t.handsUntilNextLevel(),
@@ -230,18 +248,36 @@ export class GameController {
       button: hand ? t.button : t.isOver ? t.button : t.nextButton(),
       seeded: this.#session.deckRng !== null && !this.#session.setup.daily,
       gameOver: t.isOver,
-      humanFinish: this.#session.humanFinish,
+      humanFinish: viewer === this.#session.humanSeat ? this.#session.humanFinish : (this.#finishes.get(viewer) ?? null),
       mode: this.#session.setup.mode,
       daily: this.#session.setup.daily ?? null,
       prizes: prizeTable(this.#session.setup),
       cash: this.#session.cash
         ? {
             buyIn: this.#session.cash.buyIn,
-            humanBuyIns: this.#session.cash.buyIns[this.#session.seats[this.#session.humanSeat]!.id] ?? 1,
+            humanBuyIns: this.#session.cash.buyIns[this.#session.seats[viewer]!.id] ?? 1,
             leaving: !!this.#session.cash.leaving,
           }
         : null,
+      online: this.#remotes.size > 0,
     };
+  }
+
+  /** Tells every remote player something, each from their own seat. Never waits for them. */
+  #toRemotes(call: (remote: Presenter, seat: number) => unknown): void {
+    for (const [seat, remote] of this.#remotes) {
+      try {
+        const result = call(remote, seat);
+        if (result instanceof Promise) result.catch(() => undefined);
+      } catch {
+        /* a remote player's connection never stops the game */
+      }
+    }
+  }
+
+  #thinking(seat: number | null): void {
+    if (!this.#fastForward) this.#presenter.thinking(seat, this.snapshot());
+    this.#toRemotes((r, s) => r.thinking(seat === s ? null : seat, this.snapshotFor(s)));
   }
 
   /** True once there is nothing left to play (tournament over, or cash game cashed out). */
@@ -296,6 +332,10 @@ export class GameController {
   }
 
   async #present(events: HandEvent[]): Promise<void> {
+    this.#toRemotes((r, s) => {
+      const visible = eventsVisibleTo(events, s);
+      return visible.length ? r.present(visible, this.snapshotFor(s)) : undefined;
+    });
     if (this.#fastForward) return;
     const visible = eventsVisibleTo(events, this.#session.humanSeat);
     if (visible.length) await this.#presenter.present(visible, this.snapshot());
@@ -309,6 +349,7 @@ export class GameController {
     this.#running = true;
     try {
       this.#presenter.reset(this.snapshot());
+      this.#toRemotes((r, s) => r.reset(this.snapshotFor(s)));
       while (!this.#stopped) {
         if (this.#table.awaitingSettlement) {
           await this.#finishHand();
@@ -386,6 +427,28 @@ export class GameController {
         }
         throw error;
       }
+    } else if (info.kind === 'remote') {
+      const remote = this.#remotes.get(seat);
+      const snap = this.snapshotFor(seat);
+      if (!remote) {
+        // Nobody is connected for this seat (it can only happen to a resumed online game): sit out.
+        action = safeFallbackAction(snap.view!.legal!);
+      } else {
+        this.#thinking(seat);
+        action = await remote.requestAction(snap, snap.view!.legal!);
+        if (this.#stopped) throw new StopSignal();
+        this.#thinking(null);
+        try {
+          hand.validate(seat, action);
+        } catch (error) {
+          if (error instanceof IllegalActionError) {
+            remote.actionRejected(error.message);
+            return;
+          }
+          throw error;
+        }
+      }
+      await this.#gate();
     } else {
       action = await this.#aiAction(seat);
       await this.#gate();
@@ -404,7 +467,7 @@ export class GameController {
     const rng = this.#aiRngs.get(info.id)!;
     const tableIds = new Set(this.#session.seats.map((s) => s.id));
     const stats = Object.fromEntries(Object.entries(this.#session.statsBook).filter(([id]) => tableIds.has(id)));
-    if (!this.#fastForward) this.#presenter.thinking(seat, this.snapshot());
+    this.#thinking(seat);
     const started = Date.now();
     let action: PlayerAction;
     let closeness = 0.3;
@@ -427,7 +490,7 @@ export class GameController {
     }
     const target = this.#hooks.thinkTime?.(closeness) ?? 0;
     await this.#wait(target - (Date.now() - started));
-    if (!this.#fastForward) this.#presenter.thinking(null, this.snapshot());
+    this.#thinking(null);
     return action;
   }
 
@@ -440,8 +503,13 @@ export class GameController {
       this.#table = TableGame.restore(this.#checkpoint);
       this.#pendingEvents = null;
       this.#save();
-      this.#presenter.notify('A problem was detected with that hand, so it was cancelled and all chips were returned.', 'error');
+      const message = 'A problem was detected with that hand, so it was cancelled and all chips were returned.';
+      this.#presenter.notify(message, 'error');
       this.#presenter.reset(this.snapshot());
+      this.#toRemotes((r, s) => {
+        r.notify(message, 'error');
+        r.reset(this.snapshotFor(s));
+      });
       return false;
     }
     throw new Error(`Game state failed integrity checks: ${problems.join('; ')}`);
@@ -471,6 +539,12 @@ export class GameController {
 
     const humanOut = settlement.eliminations.find((e) => e.seat === this.#session.humanSeat);
     const fieldSize = this.#session.seats.length;
+    for (const e of settlement.eliminations) {
+      if (e.seat !== this.#session.humanSeat) this.#finishes.set(e.seat, { place: e.place, handNumber: settlement.handNumber });
+    }
+    if (settlement.gameOver && settlement.winnerSeat !== null && settlement.winnerSeat !== this.#session.humanSeat) {
+      this.#finishes.set(settlement.winnerSeat, { place: 1, handNumber: settlement.handNumber });
+    }
     if (humanOut) this.#session.humanFinish = { place: humanOut.place, handNumber: settlement.handNumber };
     if (settlement.gameOver && settlement.winnerSeat === this.#session.humanSeat) {
       this.#session.humanFinish = { place: 1, handNumber: settlement.handNumber };
@@ -482,12 +556,19 @@ export class GameController {
       this.#hooks.humanFinished?.(place, fieldSize, prizeTable(this.#session.setup)[place - 1] ?? 0);
     }
 
+    this.#toRemotes((r, s) => {
+      r.handFinished({ record: buildHistoryRecord(hand, setup, names, s), settlement, blindsRiseNext }, this.snapshotFor(s));
+      const out = settlement.eliminations.find((e) => e.seat === s);
+      if (out && !settlement.gameOver) r.humanEliminated(out.place, fieldSize, this.snapshotFor(s));
+    });
     if (!this.#fastForward || settlement.gameOver) {
       await this.#presenter.handFinished({ record, settlement, blindsRiseNext }, this.snapshot());
     }
     if (humanOut && !settlement.gameOver && !this.#stopped) {
       await this.#gate(); // never ask over a sheet the player has open
-      const choice = await this.#presenter.humanEliminated(humanOut.place, fieldSize, this.snapshot());
+      let choice = await this.#presenter.humanEliminated(humanOut.place, fieldSize, this.snapshot());
+      // Friends are still playing: the game cannot skip ahead without them.
+      if (choice === 'skip' && this.#remotes.size) choice = 'watch';
       if (choice === 'menu') {
         this.#session.spectate = 'skip';
         this.#save();
@@ -525,6 +606,21 @@ export class GameController {
       this.#session.humanFinish?.place ?? (winner.seat === this.#session.humanSeat ? 1 : (this.#table.players()[this.#session.humanSeat]!.place ?? 0));
     const prizes = prizeTable(this.#session.setup);
     this.#save();
+    this.#toRemotes((r, s) => {
+      const place = s === winner.seat ? 1 : (this.#finishes.get(s)?.place ?? this.#table.players()[s]!.place ?? 0);
+      r.gameOver(
+        {
+          winnerSeat: winner.seat,
+          winnerName: this.#session.seats[winner.seat]!.name,
+          humanPlace: place,
+          fieldSize: this.#session.seats.length,
+          hands: this.#table.handNumber,
+          prizes,
+          humanPrize: prizes[place - 1] ?? 0,
+        },
+        this.snapshotFor(s),
+      );
+    });
     this.#presenter.gameOver(
       {
         winnerSeat: winner.seat,

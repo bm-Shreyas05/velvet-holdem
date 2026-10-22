@@ -229,6 +229,17 @@ test('daily challenge: today’s table starts from the menu and is marked as the
   await expect(page.locator('.action-bar')).toBeVisible();
 });
 
+test('the recorded card and chip sounds load after the first tap', async ({ page }) => {
+  const errors = trackErrors(page);
+  await page.goto('./#dev');
+  const webAudio = await page.evaluate(() => 'AudioContext' in window || 'webkitAudioContext' in window);
+  test.skip(!webAudio, 'this browser build has no Web Audio (Playwright WebKit on Windows); real Safari does');
+  await startGame(page);
+  const recorded = () => page.evaluate(() => (window as unknown as { __velvet: { recordedSound(): boolean } }).__velvet.recordedSound());
+  await expect.poll(recorded, { timeout: 15_000 }).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test('saves can be exported to a file and imported back', async ({ page }, info) => {
   test.skip(info.project.name !== 'chromium' && info.project.name !== 'webkit', 'file round trip checked on desktop engines');
   await page.goto('./');

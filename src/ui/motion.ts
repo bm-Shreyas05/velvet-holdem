@@ -6,11 +6,13 @@
 export class Motion {
   speed = 1;
   reduced = false;
+  /** Online games in a hidden tab: no animation at all, so the table never waits on a screen nobody sees. */
+  suspended = false;
   #skipping = false;
   #running = new Set<Animation>();
 
   duration(ms: number): number {
-    if (this.#skipping) return 0;
+    if (this.#skipping || this.suspended) return 0;
     if (this.reduced) return Math.min(ms, 120) * 0.6;
     return ms * this.speed;
   }

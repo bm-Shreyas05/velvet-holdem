@@ -3,14 +3,21 @@ import { CryptoRng, type Rng, SeededRng, type SeedState, isSeedState, randomInt 
 import { type StatsBook, isStatsBook } from '../ai/model.ts';
 import { STYLE_ORDER, type StyleId, isStyle } from '../ai/profiles.ts';
 import { SCENARIOS, preparedDeck } from '../dev/scenarios.ts';
-import { type NewGameSetup, gameConfigFor, normaliseSetup, validateSetup } from './config.ts';
+import { MAX_OPPONENTS, type NewGameSetup, gameConfigFor, normaliseSetup, validateSetup } from './config.ts';
 import { type PlayerStats, emptyStats, isPlayerStats } from './stats.ts';
 
 export interface SeatInfo {
   id: string;
   name: string;
-  kind: 'human' | 'ai';
+  /** 'remote': a friend playing from their own device (online games, see src/net). */
+  kind: 'human' | 'ai' | 'remote';
   style: StyleId | null;
+}
+
+/** A friend who joined an online game: seated after the host, before the AI players. */
+export interface GuestSeat {
+  id: string;
+  name: string;
 }
 
 /** Cash games: how many times each player has bought in, and the human's cash-out. */
@@ -62,8 +69,8 @@ function nextSeed(rng: Rng): SeedState {
   return [rng.nextUint32(), rng.nextUint32(), rng.nextUint32(), (rng.nextUint32() | 1) >>> 0];
 }
 
-export function createSession(setup: NewGameSetup): SessionData {
-  const problem = validateSetup(setup);
+export function createSession(setup: NewGameSetup, guests: GuestSeat[] = []): SessionData {
+  const problem = validateSetup(setup) ?? validateGuests(setup, guests);
   if (problem) throw new Error(problem);
   const scenario = setup.scenario ? SCENARIOS.find((s) => s.id === setup.scenario) : undefined;
   if (setup.scenario && !scenario) throw new Error(`Unknown scenario "${setup.scenario}"`);
@@ -75,6 +82,7 @@ export function createSession(setup: NewGameSetup): SessionData {
 
   const unused = [...STYLE_ORDER];
   const seats: SeatInfo[] = [{ id: 'human', name: setup.playerName.trim(), kind: 'human', style: null }];
+  for (const g of guests) seats.push({ id: g.id, name: g.name.trim(), kind: 'remote', style: null });
   setup.opponents.forEach((o, i) => {
     let style: StyleId;
     if (o.style === 'random') {
@@ -125,6 +133,24 @@ export function createSession(setup: NewGameSetup): SessionData {
     ...(devDecks ? { devDecks } : {}),
     ...(cash ? { cash } : {}),
   };
+}
+
+/** Online games: every friend needs a unique name and a seat (nine players at most, AI included). */
+export function validateGuests(setup: NewGameSetup, guests: GuestSeat[]): string | null {
+  if (guests.length !== (setup.guests ?? 0)) return 'The setup does not match the players who joined.';
+  if (!guests.length) return null;
+  if (guests.length + setup.opponents.length > MAX_OPPONENTS) return `A table seats at most ${MAX_OPPONENTS + 1} players.`;
+  const names = new Set([setup.playerName, ...setup.opponents.map((o) => o.name)].map((n) => n.trim().toLowerCase()));
+  const ids = new Set<string>();
+  for (const g of guests) {
+    const n = g.name.trim();
+    if (!n || n.length > 24) return 'Every player needs a name of at most 24 characters.';
+    if (names.has(n.toLowerCase())) return `The name "${n}" is used twice.`;
+    if (!/^guest-\w+$/.test(g.id) || ids.has(g.id)) return 'Damaged player list.';
+    names.add(n.toLowerCase());
+    ids.add(g.id);
+  }
+  return null;
 }
 
 /** Fills fields added in later versions (saves from older versions keep loading). */

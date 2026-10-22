@@ -23,7 +23,7 @@ function boot(): void {
   try {
     initPwa();
     const app = new App(root);
-    app.showMenu();
+    app.start();
     let reported = 0;
     const report = (message: string) => {
       console.error(message);

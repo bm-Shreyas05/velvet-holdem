@@ -60,6 +60,8 @@ export interface NewGameSetup {
   payout: PayoutId;
   /** Daily challenge date (YYYY-MM-DD): a fixed table and deal sequence shared by everyone. */
   daily?: string;
+  /** Online games: how many friends are seated besides the host (they are not in `opponents`). */
+  guests?: number;
   /** Developer option: reproducible deck and AI randomness. Never set in normal play. */
   seed?: string;
   /** Developer option: deal the first hand from a prepared scenario (see src/dev/scenarios.ts). */
@@ -68,6 +70,11 @@ export interface NewGameSetup {
 
 export const MIN_OPPONENTS = 1;
 export const MAX_OPPONENTS = 8;
+
+/** Everyone at the table: you, the AI opponents and any friends playing online. */
+export function playerCount(s: NewGameSetup): number {
+  return s.opponents.length + (s.guests ?? 0) + 1;
+}
 
 export function defaultSetup(): NewGameSetup {
   return {
@@ -105,8 +112,10 @@ export function validateSetup(s: NewGameSetup): string | null {
   const name = s.playerName.trim();
   if (!name) return 'Enter a name for yourself.';
   if (name.length > 24) return 'Names can be at most 24 characters.';
-  if (!Array.isArray(s.opponents) || s.opponents.length < MIN_OPPONENTS || s.opponents.length > MAX_OPPONENTS) {
-    return `Choose between ${MIN_OPPONENTS} and ${MAX_OPPONENTS} opponents.`;
+  const guests = s.guests ?? 0;
+  if (!Number.isInteger(guests) || guests < 0) return 'Damaged player list.';
+  if (!Array.isArray(s.opponents) || s.opponents.length + guests < MIN_OPPONENTS || s.opponents.length + guests > MAX_OPPONENTS) {
+    return guests ? `A table seats between 2 and ${MAX_OPPONENTS + 1} players.` : `Choose between ${MIN_OPPONENTS} and ${MAX_OPPONENTS} opponents.`;
   }
   const names = new Set([name.toLowerCase()]);
   for (const o of s.opponents) {
@@ -132,7 +141,7 @@ export function validateSetup(s: NewGameSetup): string | null {
   if (s.startingStack < s.bigBlind * 2)
     return s.mode === 'cash' ? 'The buy-in must be at least two big blinds.' : 'Starting stacks must be at least two big blinds.';
   if (s.mode === 'tournament') {
-    const players = s.opponents.length + 1;
+    const players = playerCount(s);
     const payout = PAYOUTS[s.payout];
     if (players < payout.minPlayers) return `"${payout.label}" needs at least ${payout.minPlayers} players.`;
   }
@@ -172,7 +181,7 @@ export function payoutsFor(s: NewGameSetup): number[] | null {
 export function prizeTable(s: NewGameSetup): number[] {
   const payouts = payoutsFor(s);
   if (!payouts) return [];
-  const pool = BUY_IN_POINTS * (s.opponents.length + 1);
+  const pool = BUY_IN_POINTS * playerCount(s);
   // Round down each place; the leftover from rounding goes to the winner, so prizes sum to the pool.
   const prizes = payouts.map((f) => Math.floor(pool * f));
   prizes[0]! += pool - prizes.reduce((a, b) => a + b, 0);

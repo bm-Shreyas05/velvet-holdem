@@ -1,7 +1,8 @@
 # Velvet — No-Limit Texas Hold'em
 
-A single-player poker game against AI opponents who play by the same rules and see the same
-information you do. It runs entirely in the browser, offline, from one self-contained HTML file.
+A poker game against AI opponents who play by the same rules and see the same information you
+do, and with friends from their own devices. It runs entirely in the browser, offline (except for
+games with friends), from one self-contained HTML file.
 
 **Play online: https://bm-shreyas05.github.io/velvet-holdem/** — free, no sign-up, installable as
 an app and playable offline. Play money only: chips have no cash value and cannot be bought.
@@ -15,10 +16,12 @@ an app and playable offline. Play money only: chips have no cash value and canno
   habits — across games, if you let it.
 - Four difficulty levels: weaker opponents make the mistakes beginners make, stronger ones think
   deeper and more consistently. None of them cheat.
+- Play with friends: host a table, send the code or link, and friends join from their own
+  browsers. No accounts and no game server; AI opponents can fill the empty seats.
 - A hand replayer, a coach that reviews your decisions, achievements that unlock table felts and
   card backs, and save export/import.
-- Animated table with illustrated court cards, synthesised sound, statistics, crash-safe saves,
-  keyboard play and accessibility options.
+- Animated table with illustrated court cards, recorded card and chip sounds, statistics,
+  crash-safe saves, keyboard play and accessibility options.
 
 ## Play
 
@@ -72,6 +75,16 @@ hands.
 deck order for every hand number, for everyone. Your first game of the day counts for your record
 and streak; replays are practice. Share your result from the game-over screen.
 
+**Play with friends** (main menu): one player chooses *Create a table* and sends the code (like
+`K7QM-3XPA`) or the invite link; the others open the link or type the code under *Join a table*.
+Up to nine players; the host can add AI opponents for the empty seats and chooses the AI
+difficulty, starting chips, blind speed and prizes, then deals. Each player sits at the bottom of
+their own screen and sees only their own cards. You have 60 seconds per decision (a countdown
+shows the last 20); when time runs out, or while you are disconnected, your hand checks or folds.
+If you lose the connection or reload, you get your seat back with the same link in the same
+browser. When the game ends the host can start a rematch with everyone still connected. Games with
+friends are tournaments; they are not saved and do not count toward statistics or achievements.
+
 ### Getting better
 
 - **Replays.** Any hand in the history can be replayed on the table, step by step, exactly as you
@@ -95,7 +108,7 @@ every save to a file and imports it in another browser or on another device.
 ## Tests and verification
 
 ```bash
-npm test                 # 111 unit and integration tests
+npm test                 # 121 unit and integration tests
 npm run test:e2e         # browser tests: Chromium, Firefox, WebKit, iPhone and Android sizes
 npm run simulate         # stress simulation (200k random hands, 400 freeze-outs, 200 cash
                          # sessions, 12 AI games)
@@ -140,9 +153,19 @@ What the checks cover:
 - **Saves and backups.** Round trip, damaged newest save (falls back to the previous one), edited
   payload (checksum), foreign data, newer versions (refused), older versions (migrated), failed
   writes; backups are verified in a scratch store before anything is replaced.
+- **Games with friends.** Over an in-memory network: a host and two friends play whole
+  tournaments (and three friends play three more, by random bots) without anyone ever being sent
+  another player's unrevealed cards, in snapshots, events or hand records; every chip is accounted
+  for and each friend learns their own finishing place. A friend who drops out folds until they
+  reconnect and then gets the table back; the shot clock acts for a silent player; malformed or
+  stale answers are refused; latecomers, a full table and other versions are turned away; a
+  screen that falls far behind skips to the current table. Room codes and names are validated.
+- **Sounds.** The packed recordings decode, cover every sound the engine asks for, are trimmed,
+  normalised and faded out; a truncated or wrong file is rejected (the game then synthesises).
 - **Accessibility.** axe-core checks every screen and sheet against WCAG 2.1 A and AA rules in
   light and dark themes: the menu, setup, statistics, history, achievements, help, settings, the
-  table on your turn, the pause menu, hand detail and the replay with the coach. Open sheets make
+  table on your turn, the pause menu, hand detail, the replay with the coach, *Play with friends*
+  and the host's lobby. Open sheets make
   the page behind them inert. Automated rules do not replace a pass with a real screen reader.
 - **Real browsers** (`npm run test:e2e`, Playwright; run `npx playwright install` once first).
   In desktop Chromium, Firefox and WebKit and in iPhone 13 and Pixel 7 emulation: the menu loads
@@ -151,7 +174,10 @@ What the checks cover:
   from screenshot pixels); every seat stays on screen with the longest possible names; a hand is
   replayed and reviewed by the coach; coach hints appear; a cash game is cashed out mid-hand; the
   daily challenge starts; achievements are awarded; opponents remember you in a new game; saves
-  are exported to a file and imported back. In Chromium, the game is played offline.
+  are exported to a file and imported back; the recorded sounds load. A host and a friend in two
+  tabs create, join and play a table (each seated at the bottom of their own screen, never shown
+  the other's cards), the friend leaves and the host is told; a wrong code is explained and
+  closing the table sends friends back. In Chromium, the game is played offline.
 
 ### AI evaluation (last full run)
 
@@ -198,14 +224,17 @@ src/
   ui/       app shell, screens, sheets, replayer, table-view, table-model, presenter, action-bar,
             controls-model, dialogs, log-panel, layout, motion, format, pwa, dom
   assets/   procedurally drawn cards and court figures, chips, avatars, icons (SVG)
-  audio/    synthesised sound (Web Audio)
+  audio/    sound (Web Audio): recorded cards and chips, synthesised everything else
+  net/      games with friends: protocol, rooms (WebRTC, BroadcastChannel, in-memory), the
+            host's lobby and stand-ins for remote players, a friend's client
   dev/      developer scenarios
   sim/      scripted sparring bots and a headless presenter for tests and simulations
   styles/   main.css
   pwa/      service worker template (the build stamps in a version and the asset list)
-public/     web-app manifest, icons, social preview image (copied into dist/)
+public/     web-app manifest, icons, social preview image, packed sounds (copied into dist/)
+assets/     source recordings for the sounds (Kenney "Casino Audio", CC0)
 scripts/    build, serve, simulate, evaluate-ai, exhaustive-evaluator, gen-preflop-table,
-            gen-images, dev/
+            gen-images, gen-sounds, dev/
 tests/      node:test suites
 e2e/        Playwright browser tests
 .github/    CI and GitHub Pages deployment
@@ -256,6 +285,16 @@ decisions and keeps only the player's view at each step, so it shows exactly wha
 the table. The coach evaluates the player's decisions from those same views with the Elite engine,
 pricing the player's exact action next to the engine's own options.
 
+**Games with friends.** The host's browser runs the ordinary game loop; each friend's seat has a
+stand-in presenter (`net/remote.ts`) to which the controller sends exactly what it would show a
+local player in that seat: snapshots and events built from that seat's own view, and hand records
+written from it. Only a friend's own decisions are waited for. On the friend's device
+(`net/guest.ts`) those messages drive the same presenter and animated table as a local game.
+Browsers find each other through [Trystero](https://github.com/dmotz/trystero) over free public
+Nostr relays, which carry only the connection offers, encrypted with the table code; the game then
+travels directly between browsers over encrypted WebRTC data channels. That layer is a separate
+file (`dist/net.js`, 74 KB) loaded only when someone opens a table with friends.
+
 **Interface.** Plain TypeScript and DOM (no framework). The table is a fixed-geometry stage scaled
 to the window, with landscape and portrait layouts. `table-model.ts` advances a plain display
 model one event at a time so animations play between states, then reconciles with the engine's
@@ -276,10 +315,15 @@ snapshot after every batch. The replayer drives a second table with the same pre
   replays and the developer mode. AI randomness is a separate stream unrelated to the deck.
 - **Learning tools see what you saw.** Replays and the coach work from the player's own views, so
   they can never reveal an opponent's folded cards.
-- **Procedural assets.** Cards (including the court figures), chips, avatars, icons and sounds are
-  generated, so there are no binary assets to lose and everything scales cleanly. The only images
-  are the app icons and the link-preview picture, which `npm run gen:images` renders from the same
-  artwork with a local Chrome or Edge.
+- **Procedural assets.** Cards (including the court figures), chips, avatars and icons are
+  generated, so everything scales cleanly. The only images are the app icons and the link-preview
+  picture, which `npm run gen:images` renders from the same artwork with a local Chrome or Edge.
+- **Recorded sounds.** Cards and chips use real recordings from Kenney's
+  [Casino Audio](https://kenney.nl/assets/casino-audio) (CC0), with several takes per sound and
+  small variations in pitch and level. `npm run gen:sounds` packs them into `public/sounds.bin`
+  as 8-bit µ-law at 32 kHz (216 KB), decoded by the game itself so every browser plays the same
+  bytes (Safari before 17 cannot decode Ogg). The file loads after the first tap; until then, and
+  in the single-file builds, the synthesised sounds play.
 - **Static hosting.** The game needs no server: any static host can serve `dist/`. The service
   worker precaches this exact build and serves it first, so it loads instantly and offline; a new
   deployment changes the worker, the browser fetches it in the background, and the game offers a
@@ -329,7 +373,9 @@ phones.
 ## Saved data
 
 Nothing leaves your device: there are no accounts, analytics or ads. (The host serving the page
-sees ordinary web requests when it loads.) Everything is stored in the browser's local storage
+sees ordinary web requests when it loads.) The exception is a game with friends, which sends the
+game to the other players' browsers; to find each other, browsers exchange encrypted connection
+offers through public Nostr relays, which therefore see your IP address. Everything is stored in the browser's local storage
 for the page: `velvet.session` (the game in progress, saved after every action — including
 mid-hand, so closing the page never lets anyone escape a hand), `velvet.history` (up to 300 hands
 of the current game), `velvet.career` (lifetime statistics), `velvet.progress` (achievements,
@@ -349,19 +395,26 @@ Add `#dev` to the URL. The New game screen then offers a seed (reproducible deck
 and prepared first hands (a split pot, a multi-way all-in with side pots); such games are marked
 *Seeded*. Hand history adds *Copy replay data* (deck order and decisions), which
 `replayHand()` in `src/engine/replay.ts` reproduces exactly. `window.__velvet` exposes read-only
-snapshots for debugging. None of this is visible in normal play.
+snapshots for debugging. None of this is visible in normal play. With `#dev&net=local`, tables
+with friends connect tabs of the same browser over a BroadcastChannel instead of WebRTC (the
+browser tests use this).
 
 ## Known limitations
 
 - One table of up to nine players (you and eight opponents); the engine itself supports ten.
-- No online play: there are no global leaderboards or games against other people, which would
-  need a server, accounts and moderation. The daily challenge's result can be shared as text.
+- Games with friends connect browsers directly. Some networks (strict workplace or school
+  firewalls, a few mobile carriers) block that, and without a relay server of our own (TURN)
+  those players cannot join. The host's device runs the game and holds every card, so play with
+  people you trust; the host's tab must stay open (in a background tab, animations stop so the
+  game keeps moving, but browsers may slow its timers).
+- No global leaderboards: they would need a server, accounts and moderation. The daily
+  challenge's result can be shared as text.
 - The AI is a strong heuristic player, not a solver: it models opponents with summary statistics
   rather than full game-theoretic strategies, and the coach's values are that model's estimates.
 - The daily challenge's decks follow from the date, so someone determined could compute them in
   advance; with no prizes or rankings at stake this only spoils their own fun.
 - The button always moves to the next player; the tournament "dead button" rule is not used.
-- Sounds are synthesised rather than recorded. On iPhone, sound follows the ring/silent switch.
+- On iPhone, sound follows the ring/silent switch.
 - Tested in real browser engines with phone emulation, but not yet on physical phones.
 - Saves live in one browser profile unless exported; private-browsing modes that block storage
   keep the game in memory only (the game says so).
